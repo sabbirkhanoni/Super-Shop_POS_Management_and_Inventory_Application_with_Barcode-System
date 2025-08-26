@@ -55,31 +55,72 @@ namespace InventoryManagementSystem
 
 
         private void PopulateGridViewSaleInventory(string query = @"
-                SELECT 
-    p.ProductId,
-    p.ProductName,
-    c.CategoryName,
-    b.BrandName,
-    p.SalePrice,
-    p.PurchaseCost,
-    COALESCE(SUM(pd.Quantity), 0) AS Quantity
-FROM 
-    ProductTable p
-INNER JOIN 
-    PurchaseDetailTable pd ON p.ProductId = pd.ProductId
-LEFT JOIN 
-    CategoryTable c ON p.CategoryId = c.CategoryId
-LEFT JOIN 
-    BrandTable b ON p.BrandId = b.BrandId
-GROUP BY 
-    p.ProductId,
-    p.ProductName,
-    c.CategoryName,
-    b.BrandName,
-    p.SalePrice,
-    p.PurchaseCost
-HAVING 
-    COALESCE(SUM(pd.Quantity), 0) >= 0;
+                -- Inventory Display Query - Current Stock Status with Returned and Damage Quantities
+                    WITH ProductStock AS (
+                        -- Calculate total purchased per product
+                        SELECT 
+                            ProductId,
+                            SUM(Quantity) as TotalPurchased
+                        FROM PurchaseDetailTable
+                        GROUP BY ProductId
+                    ),
+                    ProductSold AS (
+                        -- Calculate total sold per product
+                        SELECT 
+                            ProductId,
+                            SUM(SaleQuantity) as TotalSold
+                        FROM SaleDetailTable
+                        GROUP BY ProductId
+                    ),
+                    ProductDamaged AS (
+                        -- Calculate total damaged per product
+                        SELECT 
+                            ProductId,
+                            SUM(DamageQuantity) as TotalDamaged
+                        FROM DamageDetailTable
+                        GROUP BY ProductId
+                    ),
+                    ProductReturned AS (
+                        -- Calculate total returned per product
+                        SELECT 
+                            ProductId,
+                            SUM(ReturnQuantity) as TotalReturned
+                        FROM ReturnDetailTable
+                        GROUP BY ProductId
+                    )
+                    SELECT 
+                        p.ProductId,
+                        p.ProductName,
+                        c.CategoryName,
+                        b.BrandName,
+                        p.PurchaseCost,
+                        p.SalePrice,
+                        -- Total Purchased Quantity
+                        ISNULL(ps.TotalPurchased, 0) AS TotalPurchased,
+                        -- Total Sold Quantity
+                        ISNULL(psold.TotalSold, 0) AS TotalSold,
+                        -- Returned Quantity (Total Returned Quantity Of That Product)
+                        ISNULL(pr.TotalReturned, 0) AS ReturnedQuantity,
+                        -- Damage Quantity (Total Damage Quantity Of That Product)
+                        ISNULL(pd.TotalDamaged, 0) AS DamageQuantity,
+                        -- Current Available Quantity
+                        (ISNULL(ps.TotalPurchased, 0) 
+                            - ISNULL(psold.TotalSold, 0) 
+                            - ISNULL(pd.TotalDamaged, 0) 
+                            + ISNULL(pr.TotalReturned, 0)) AS CurrentAvailableQuantity
+                    FROM 
+                        ProductTable p
+                        INNER JOIN CategoryTable c ON p.CategoryId = c.CategoryId
+                        INNER JOIN BrandTable b ON p.BrandId = b.BrandId
+                        LEFT JOIN ProductStock ps ON p.ProductId = ps.ProductId
+                        LEFT JOIN ProductSold psold ON p.ProductId = psold.ProductId
+                        LEFT JOIN ProductDamaged pd ON p.ProductId = pd.ProductId
+                        LEFT JOIN ProductReturned pr ON p.ProductId = pr.ProductId
+                    -- Optional filters (uncomment as needed):
+                    WHERE (ISNULL(ps.TotalPurchased, 0) - ISNULL(psold.TotalSold, 0) - ISNULL(pd.TotalDamaged, 0) + ISNULL(pr.TotalReturned, 0)) >= 0  -- Only products with stock
+                    -- WHERE (ISNULL(ps.TotalPurchased, 0) - ISNULL(psold.TotalSold, 0) - ISNULL(pd.TotalDamaged, 0) + ISNULL(pr.TotalReturned, 0)) <= 5  -- Low stock alert
+                    ORDER BY 
+                        p.ProductId DESC;
 
            ")
         {
@@ -122,47 +163,31 @@ HAVING
                 return;
             }
 
-            try
+            try { 
+                // Insert a record into the ReturnDetailTable
+                string insertQuery = "INSERT INTO ReturnDetailTable (CustomerId, ProductId, ReturnQuantity) VALUES (@CustomerId, @ProductId, @ReturnQuantity)";
+            var insertParams = new[]
             {
-                // Update the product's quantity in the PurchaseDetailTable
-                string updateQuery = "UPDATE PurchaseDetailTable SET Quantity = Quantity + @Quantity WHERE ProductId = @ProductId";
-                var updateParams = new[]
+            new SqlParameter("@CustomerId", customerId),
+            new SqlParameter("@ProductId", selectedProductId),
+            new SqlParameter("@ReturnQuantity", quantity)
+
+                };
+
+                int rowsInserted = db.ExecuteDMLQuery(insertQuery, insertParams);
+
+                if (rowsInserted > 0)
                 {
-            new SqlParameter("@Quantity", quantity),
-            new SqlParameter("@ProductId", selectedProductId)
-        };
-
-                int rowsUpdated = db.ExecuteDMLQuery(updateQuery, updateParams);
-
-                if (rowsUpdated > 0)
-                {
-                    // Insert a record into the ReturnDetailTable
-                    string insertQuery = "INSERT INTO ReturnDetailTable (CustomerId, ProductId, ReturnQuantity) VALUES (@CustomerId, @ProductId, @ReturnQuantity)";
-                    var insertParams = new[]
-                    {
-                new SqlParameter("@CustomerId", customerId),
-                new SqlParameter("@ProductId", selectedProductId),
-                new SqlParameter("@ReturnQuantity", quantity)
-            };
-
-                    int rowsInserted = db.ExecuteDMLQuery(insertQuery, insertParams);
-
-                    if (rowsInserted > 0)
-                    {
-                        MessageBox.Show("Product successfully returned.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        PopulateGridViewSaleInventory(); // Refresh the grid view
-                        clearFeilds(); // Clear the input fields
-                    }
-                    else
-                    {
-                        MessageBox.Show("Failed To Log The Return. Please Try Again", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
+                    MessageBox.Show("Product successfully returned.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    PopulateGridViewSaleInventory(); // Refresh the grid view
+                    clearFeilds(); // Clear the input fields
                 }
                 else
                 {
-                    MessageBox.Show("Failed to update product quantity. Please try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Failed To Log The Return. Please Try Again", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
+
             catch (SqlException ex)
             {
                 MessageBox.Show("A database error occurred: " + ex.Message, "Database Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -196,40 +221,24 @@ HAVING
 
             try
             {
-                string updateQuery = "UPDATE PurchaseDetailTable SET Quantity = Quantity - @Quantity WHERE ProductId = @ProductId";
-                var updateParams = new[]
+                string insertQuery = "INSERT INTO DamageDetailTable (ProductId, DamageQuantity) VALUES (@ProductId, @DamageQuantity)";
+                var insertParams = new[]
                 {
-            new SqlParameter("@Quantity", quantity),
-            new SqlParameter("@ProductId", selectedProductId)
-        };
-
-                var rowAffected = db.ExecuteDMLQuery(updateQuery, updateParams);
-
-                if (rowAffected > 0)
-                {
-                    string insertQuery = "INSERT INTO DamageDetailTable (ProductId, DamageQuantity) VALUES (@ProductId, @DamageQuantity)";
-                    var insertParams = new[]
-                    {
                 new SqlParameter("@ProductId", selectedProductId),
                 new SqlParameter("@DamageQuantity", quantity)
-            };
+                        };
 
-                    var insertRowAffected = db.ExecuteDMLQuery(insertQuery, insertParams);
+                var insertRowAffected = db.ExecuteDMLQuery(insertQuery, insertParams);
 
-                    if (insertRowAffected > 0)
-                    {
-                        MessageBox.Show("Oops! Damage Occurred", "Damage Effect Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        PopulateGridViewSaleInventory();
-                        clearFeilds();
-                    }
-                    else
-                    {
-                        MessageBox.Show("Error Occurred In Damage Insertion", "Insertion Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
+                if (insertRowAffected > 0)
+                {
+                    MessageBox.Show("Oops! Damage Occurred", "Damage Effect Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    PopulateGridViewSaleInventory();
+                    clearFeilds();
                 }
                 else
                 {
-                    MessageBox.Show("Error Occurred In Damage Updation", "Update Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show("Error Occurred In Damage Insertion", "Insertion Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
             catch (SqlException ex)
@@ -252,9 +261,7 @@ HAVING
 
         private void btnBack_Click(object sender, EventArgs e)
         {
-            SalesmanInventoryStore salesmanInventoryStore = new SalesmanInventoryStore();
-            salesmanInventoryStore.Show();
-            this.Close();
+            FormManager.OpenForm(this, typeof(AdminMainDashBoard));
         }
 
         private void DGVReturnDamageProducts_CellClick(object sender, DataGridViewCellEventArgs e)

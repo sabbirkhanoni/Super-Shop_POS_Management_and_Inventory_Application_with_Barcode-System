@@ -55,9 +55,7 @@ namespace InventoryManagementSystem
 
         private void btnBack_Click(object sender, EventArgs e)
         {
-            AdminMainDashBoard adminMainDashBoard = new AdminMainDashBoard();
-            adminMainDashBoard.Show();
-            this.Hide();
+            FormManager.OpenForm(this, typeof(AdminMainDashBoard));
         }
 
         private void btnAddUser_Click(object sender, EventArgs e)

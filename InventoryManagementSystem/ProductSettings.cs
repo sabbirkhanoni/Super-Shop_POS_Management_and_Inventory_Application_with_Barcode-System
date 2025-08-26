@@ -53,7 +53,7 @@ namespace InventoryManagementSystem
                 // Apply filter if provided
                 if (!string.IsNullOrWhiteSpace(filter))
                 {
-                    query += $" WHERE CategoryName LIKE '%{filter}%'";
+                    query += $" WHERE CategoryName LIKE '{filter}%'";
                 }
 
                 var ds = db.ExecuteQuery(query);
@@ -84,7 +84,7 @@ namespace InventoryManagementSystem
                 // Apply filter if provided
                 if (!string.IsNullOrWhiteSpace(filter))
                 {
-                    query += $" WHERE BrandName LIKE '%{filter}%'";
+                    query += $" WHERE BrandName LIKE '{filter}%'";
                 }
 
                 var ds = db.ExecuteQuery(query);
@@ -347,9 +347,7 @@ namespace InventoryManagementSystem
 
         private void btnBack_Click(object sender, EventArgs e)
         {
-            SalesmanInventoryStore salesmanInventoryStore = new SalesmanInventoryStore();
-            salesmanInventoryStore.Show();
-            this.Hide();
+            FormManager.OpenForm(this, typeof(AdminMainDashBoard));
         }
 
         private void btnCancel_Click(object sender, EventArgs e)
@@ -377,6 +375,11 @@ namespace InventoryManagementSystem
         {
             DGVBrand.ClearSelection();
             DGVBrand.CurrentCell = null;
+        }
+
+        private void btnClose_Click(object sender, EventArgs e)
+        {
+            this.Close();
         }
     }
 }

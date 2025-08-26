@@ -34,7 +34,6 @@
             this.label2 = new System.Windows.Forms.Label();
             this.btnAllPrint = new System.Windows.Forms.Button();
             this.btnSingleCustomerPrint = new System.Windows.Forms.Button();
-            this.btnSendMessageToAll = new System.Windows.Forms.Button();
             this.btnAddUser = new System.Windows.Forms.Button();
             this.txtPaymentAmount = new System.Windows.Forms.TextBox();
             this.txtCurrentDueSelectedCustomer = new System.Windows.Forms.TextBox();
@@ -44,10 +43,6 @@
             this.label1 = new System.Windows.Forms.Label();
             this.txtSearchBar = new System.Windows.Forms.TextBox();
             this.panel4 = new System.Windows.Forms.Panel();
-            this.Role = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.Password = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.UserName = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.UserId = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.DGVSupplierDueDetails = new System.Windows.Forms.DataGridView();
             this.btnBack = new System.Windows.Forms.Button();
             this.panel2 = new System.Windows.Forms.Panel();
@@ -93,18 +88,6 @@
             this.btnSingleCustomerPrint.Text = "Print";
             this.btnSingleCustomerPrint.UseVisualStyleBackColor = false;
             // 
-            // btnSendMessageToAll
-            // 
-            this.btnSendMessageToAll.BackColor = System.Drawing.Color.Brown;
-            this.btnSendMessageToAll.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnSendMessageToAll.ForeColor = System.Drawing.SystemColors.Control;
-            this.btnSendMessageToAll.Location = new System.Drawing.Point(436, 12);
-            this.btnSendMessageToAll.Name = "btnSendMessageToAll";
-            this.btnSendMessageToAll.Size = new System.Drawing.Size(165, 48);
-            this.btnSendMessageToAll.TabIndex = 8;
-            this.btnSendMessageToAll.Text = "Send Message";
-            this.btnSendMessageToAll.UseVisualStyleBackColor = false;
-            // 
             // btnAddUser
             // 
             this.btnAddUser.BackColor = System.Drawing.SystemColors.Highlight;
@@ -142,7 +125,6 @@
             | System.Windows.Forms.AnchorStyles.Right)));
             this.panel5.Controls.Add(this.btnAllPrint);
             this.panel5.Controls.Add(this.btnSingleCustomerPrint);
-            this.panel5.Controls.Add(this.btnSendMessageToAll);
             this.panel5.Controls.Add(this.btnAddUser);
             this.panel5.Location = new System.Drawing.Point(12, 87);
             this.panel5.Name = "panel5";
@@ -200,38 +182,6 @@
             this.panel4.Size = new System.Drawing.Size(492, 71);
             this.panel4.TabIndex = 35;
             // 
-            // Role
-            // 
-            this.Role.DataPropertyName = "Role";
-            this.Role.HeaderText = "Role";
-            this.Role.MinimumWidth = 6;
-            this.Role.Name = "Role";
-            this.Role.ReadOnly = true;
-            // 
-            // Password
-            // 
-            this.Password.DataPropertyName = "Password";
-            this.Password.HeaderText = "Password";
-            this.Password.MinimumWidth = 6;
-            this.Password.Name = "Password";
-            this.Password.ReadOnly = true;
-            // 
-            // UserName
-            // 
-            this.UserName.DataPropertyName = "UserName";
-            this.UserName.HeaderText = "Username";
-            this.UserName.MinimumWidth = 6;
-            this.UserName.Name = "UserName";
-            this.UserName.ReadOnly = true;
-            // 
-            // UserId
-            // 
-            this.UserId.DataPropertyName = "UserId";
-            this.UserId.HeaderText = "ID";
-            this.UserId.MinimumWidth = 6;
-            this.UserId.Name = "UserId";
-            this.UserId.ReadOnly = true;
-            // 
             // DGVSupplierDueDetails
             // 
             this.DGVSupplierDueDetails.AllowUserToAddRows = false;
@@ -250,11 +200,6 @@
             dataGridViewCellStyle1.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
             this.DGVSupplierDueDetails.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle1;
             this.DGVSupplierDueDetails.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.DGVSupplierDueDetails.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
-            this.UserId,
-            this.UserName,
-            this.Password,
-            this.Role});
             dataGridViewCellStyle2.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
             dataGridViewCellStyle2.BackColor = System.Drawing.SystemColors.Window;
             dataGridViewCellStyle2.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
@@ -286,9 +231,9 @@
             this.btnBack.BackColor = System.Drawing.Color.MidnightBlue;
             this.btnBack.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnBack.ForeColor = System.Drawing.SystemColors.Control;
-            this.btnBack.Location = new System.Drawing.Point(1410, 0);
+            this.btnBack.Location = new System.Drawing.Point(1407, 4);
             this.btnBack.Name = "btnBack";
-            this.btnBack.Size = new System.Drawing.Size(113, 66);
+            this.btnBack.Size = new System.Drawing.Size(113, 55);
             this.btnBack.TabIndex = 22;
             this.btnBack.Text = "Back";
             this.btnBack.UseVisualStyleBackColor = false;
@@ -330,6 +275,7 @@
             this.Name = "SupplierDueDetails";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "SupplierDueDetails";
+            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
             this.panel5.ResumeLayout(false);
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
@@ -347,7 +293,6 @@
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Button btnAllPrint;
         private System.Windows.Forms.Button btnSingleCustomerPrint;
-        private System.Windows.Forms.Button btnSendMessageToAll;
         private System.Windows.Forms.Button btnAddUser;
         private System.Windows.Forms.TextBox txtPaymentAmount;
         private System.Windows.Forms.TextBox txtCurrentDueSelectedCustomer;
@@ -357,10 +302,6 @@
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.TextBox txtSearchBar;
         private System.Windows.Forms.Panel panel4;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Role;
-        private System.Windows.Forms.DataGridViewTextBoxColumn Password;
-        private System.Windows.Forms.DataGridViewTextBoxColumn UserName;
-        private System.Windows.Forms.DataGridViewTextBoxColumn UserId;
         private System.Windows.Forms.DataGridView DGVSupplierDueDetails;
         private System.Windows.Forms.Button btnBack;
         private System.Windows.Forms.Panel panel2;

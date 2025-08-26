@@ -7,7 +7,7 @@ namespace InventoryManagementSystem
 {
     public class DataAccess : IDisposable
     {
-        private SqlConnection sqlcon;
+        public SqlConnection sqlcon;
         private SqlCommand sqlcom;
         private SqlDataAdapter sda;
         private DataSet ds;
@@ -78,7 +78,16 @@ namespace InventoryManagementSystem
                 {
                     if (parameters != null)
                     {
-                        sqlcom.Parameters.AddRange(parameters);
+                        // Handle image parameters specially
+                        foreach (var param in parameters)
+                        {
+                            if (param.SqlDbType == SqlDbType.Image || param.Value is byte[])
+                            {
+                                // Ensure proper handling of image parameters
+                                param.SqlDbType = SqlDbType.Image;
+                            }
+                            sqlcom.Parameters.Add(param);
+                        }
                     }
                     sda = new SqlDataAdapter(sqlcom);
                     ds = new DataSet();

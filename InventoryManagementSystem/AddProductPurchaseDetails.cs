@@ -2,148 +2,88 @@
 using iTextSharp.text.pdf;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data;
-using System.Data.SqlClient;
 using System.Drawing;
 using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Xml.Linq;
-using ZXing.OneD;
 using Excel = Microsoft.Office.Interop.Excel;
 
 namespace InventoryManagementSystem
 {
-    public partial class AdminSaleDetails : Form
+    public partial class AddProductPurchaseDetails : Form
     {
-        DataAccess db;
-        private int pdfCounter = 1; // Counter to track the number of generated PDFs
-        int excelCounter = 1;
+        private int pdfCounter = 1;
+        private int excelCounter = 1;
         private int currentRowIndex = 0; // Add this class-level variable to track current row position
-
-        public AdminSaleDetails()
+        DataAccess db;
+        public AddProductPurchaseDetails()
         {
-            db = new DataAccess();
             InitializeComponent();
             ExtraDesign();
-            PopulateSaleDetailData(); // Load all data initially
+            db = new DataAccess();
+            PopulateMoreSaleDetailsData();
         }
 
-        public void ExtraDesign()
-        {
-            DGVSaleDetails.RowTemplate.Height = 35; // Example height in pixels
+        private void PopulateMoreSaleDetailsData(string query = @"
+                        SELECT 
+                        s.SupplierName,
+                        p.ProductId,
+                        p.ProductName,
+                        cat.CategoryName,
+                        b.BrandName,
+                        p.PurchaseCost,
+                        p.SalePrice,
+                        pd.Quantity AS PurchasedQuantity,
+                        pt.TotalAmount,
+                        pt.PaidAmount,
+                        ISNULL(pt.Discount, 0) AS Discount,
 
-            DGVSaleDetails.RowsDefaultCellStyle.BackColor = Color.LightSkyBlue; // Default row color
-            DGVSaleDetails.AlternatingRowsDefaultCellStyle.BackColor = Color.Bisque; // Alternate row color
+                        -- Specific purchase due amount
+                        ISNULL(sd.DueAmount, 0) AS PurchaseDueAmount,
 
-            DGVSaleDetails.RowsDefaultCellStyle.SelectionBackColor = Color.DarkBlue; // Background color for selected row
-            DGVSaleDetails.RowsDefaultCellStyle.SelectionForeColor = Color.White;   // Foreground color for selected row
-        }
+                        -- Total due for the supplier
+                        ISNULL(total_due.TotalDueAmount, 0) AS TotalDueAmount,
 
-        private void PopulateSaleDetailData(string filter="")
+                        pt.PurchaseDate
+                    FROM PurchaseTable pt
+                    INNER JOIN SupplierTable s 
+                        ON pt.SupplierId = s.SupplierId
+                    INNER JOIN PurchaseDetailTable pd 
+                        ON pt.PurchaseId = pd.PurchaseId
+                    INNER JOIN ProductTable p 
+                        ON pd.ProductId = p.ProductId
+                    INNER JOIN CategoryTable cat 
+                        ON p.CategoryId = cat.CategoryId
+                    INNER JOIN BrandTable b 
+                        ON p.BrandId = b.BrandId
+
+                    -- Purchase-specific due amount
+                    LEFT JOIN SupplierDueTable sd 
+                        ON pt.PurchaseId = sd.PurchaseId 
+                        AND pt.SupplierId = sd.SupplierId
+
+                    -- Total due per supplier
+                    LEFT JOIN (
+                        SELECT SupplierId, SUM(DueAmount) AS TotalDueAmount
+                        FROM SupplierDueTable
+                        GROUP BY SupplierId
+                    ) total_due 
+                        ON pt.SupplierId = total_due.SupplierId
+
+                    ORDER BY pt.PurchaseDate DESC, s.SupplierName;
+
+            ")
         {
             try
             {
-
-                string query = @"
-                           SELECT 
-                            -- Concatenated column
-                            CAST(p.ProductId AS NVARCHAR(50)) + ' - ' + 
-                            p.ProductName + ' - ' + 
-                            cat.CategoryName + ' - ' + 
-                            b.BrandName AS ProductInfo,
-
-                            -- Other columns
-                            p.PurchaseCost,
-                            p.SalePrice,
-                            ISNULL(purchase_summary.TotalPurchasedQuantity, 0) AS TotalPurchasedQuantity,
-                            ISNULL(sale_summary.TotalSoldQuantity, 0) AS TotalSoldQuantity,
-                            (ISNULL(purchase_summary.TotalPurchasedQuantity, 0) - 
-                                ISNULL(sale_summary.TotalSoldQuantity, 0) - 
-                                ISNULL(damage_summary.TotalDamagedQuantity, 0) + 
-                                ISNULL(return_summary.TotalReturnedQuantity, 0)) AS CurrentAvailableQuantity,
-                          --  (p.SalePrice * ISNULL(sale_summary.TotalSoldQuantity, 0)) AS TotalSaleValue, -- hidden
-                          --  ISNULL(sale_summary.TotalDiscount, 0) AS TotalDiscount,
-                            ISNULL(sale_summary.TotalSoldPrice, 0) AS TotalSoldPrice,
-                            ISNULL(sale_summary.TotalPaidAmount, 0) AS TotalPaidAmount,
-                            (ISNULL(sale_summary.TotalSoldPrice, 0) - ISNULL(sale_summary.TotalPaidAmount, 0)) AS TotalDue,
-                            (ISNULL(sale_summary.TotalSoldPrice, 0) - 
-                                (ISNULL(sale_summary.TotalSoldQuantity, 0) * p.PurchaseCost)) AS WouldBeProfit,
-                            ISNULL(sale_summary.CurrentProfit, 0) AS CurrentProfit
-                        FROM ProductTable p
-                        INNER JOIN CategoryTable cat ON p.CategoryId = cat.CategoryId
-                        INNER JOIN BrandTable b ON p.BrandId = b.BrandId
-                    -- Purchase Summary
-                    LEFT JOIN (
-                        SELECT 
-                            pd.ProductId,
-                            SUM(pd.Quantity) AS TotalPurchasedQuantity
-                        FROM PurchaseDetailTable pd
-                        GROUP BY pd.ProductId
-                    ) purchase_summary ON p.ProductId = purchase_summary.ProductId
-                    -- Enhanced Sale Summary with Financial Calculations and Current Profit (Aggregated per Product)
-                    LEFT JOIN (
-                        SELECT 
-                            sd.ProductId,
-                            SUM(sd.SaleQuantity) AS TotalSoldQuantity,
-                            SUM(sd.UnitPrice * sd.SaleQuantity) AS TotalSoldPrice,
-                            CAST(SUM((p.SalePrice - sd.UnitPrice) * sd.SaleQuantity) AS DECIMAL(18,2)) AS TotalDiscount,
-                            CAST(SUM(sd.UnitPrice * sd.SaleQuantity * s.PaidAmount / NULLIF(s.PayAmount, 0)) AS DECIMAL(18,2)) AS TotalPaidAmount,
-                            -- Current Profit Calculation (based on your second query)
-                            CAST(
-                                SUM(
-                                    (sd.UnitPrice * sd.SaleQuantity * s.PaidAmount / NULLIF(s.PayAmount, 0)) 
-                                    - (p.PurchaseCost * sd.SaleQuantity)
-                                ) AS DECIMAL(18,2)
-                            ) AS CurrentProfit
-                        FROM SaleDetailTable sd
-                        INNER JOIN SaleTable s ON sd.SaleId = s.SaleId
-                        INNER JOIN ProductTable p ON sd.ProductId = p.ProductId
-                        GROUP BY sd.ProductId
-                    ) sale_summary ON p.ProductId = sale_summary.ProductId
-                    -- Return Summary
-                    LEFT JOIN (
-                        SELECT 
-                            rd.ProductId,
-                            SUM(rd.ReturnQuantity) AS TotalReturnedQuantity
-                        FROM ReturnDetailTable rd
-                        GROUP BY rd.ProductId
-                    ) return_summary ON p.ProductId = return_summary.ProductId
-                    -- Damage Summary
-                    LEFT JOIN (
-                        SELECT 
-                            dd.ProductId,
-                            SUM(dd.DamageQuantity) AS TotalDamagedQuantity
-                        FROM DamageDetailTable dd
-                        GROUP BY dd.ProductId
-                    ) damage_summary ON p.ProductId = damage_summary.ProductId
-
-           ";
-
-                // Add search condition if filter is provided
-                if (!string.IsNullOrEmpty(filter))
-                {
-                    query += @"
-                WHERE 
-                    CAST(p.ProductId AS NVARCHAR) LIKE @filter OR
-                    p.ProductName LIKE @filter OR
-                    cat.CategoryName LIKE @filter OR
-                    b.BrandName LIKE @filter
-                    ";
-                }
-
-                query += "ORDER BY p.ProductId;";
-
-
                 if (db != null)
                 {
-                    var parameters = new List<SqlParameter>
-                    {
-                        new SqlParameter("@filter", $"{filter}%")
-                    };
-
-                    var ds = this.db.ExecuteQuery(query, parameters.ToArray());
+                    var ds = this.db.ExecuteQuery(query);
                     this.DGVSaleDetails.AutoGenerateColumns = true;
                     this.DGVSaleDetails.DataSource = ds.Tables[0];
                 }
@@ -158,9 +98,16 @@ namespace InventoryManagementSystem
             }
         }
 
-        private void txtSearchBar_TextChanged(object sender, EventArgs e)
+
+        public void ExtraDesign()
         {
-            PopulateSaleDetailData(txtSearchBar.Text.Trim());
+            DGVSaleDetails.RowTemplate.Height = 35; // Example height in pixels
+
+            DGVSaleDetails.RowsDefaultCellStyle.BackColor = Color.LightSkyBlue; // Default row color
+            DGVSaleDetails.AlternatingRowsDefaultCellStyle.BackColor = Color.Bisque; // Alternate row color
+
+            DGVSaleDetails.RowsDefaultCellStyle.SelectionBackColor = Color.DarkBlue; // Background color for selected row
+            DGVSaleDetails.RowsDefaultCellStyle.SelectionForeColor = Color.White;   // Foreground color for selected row
         }
 
         private void btnBack_Click(object sender, EventArgs e)
@@ -168,54 +115,15 @@ namespace InventoryManagementSystem
             FormManager.OpenForm(this, typeof(AdminMainDashBoard));
         }
 
+
         private void DGVSaleDetails_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
         {
             DGVSaleDetails.ClearSelection();
             DGVSaleDetails.CurrentCell = null;
-
-            // Set column alignments and widths
-            if (DGVSaleDetails.Columns.Count > 0)
-            {
-                // First column (ProductInfo) - left aligned
-                DGVSaleDetails.Columns[0].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
-                DGVSaleDetails.Columns[0].Width = 400; // ProductInfo column width
-
-                // All other columns - center aligned with specific widths
-                if (DGVSaleDetails.Columns.Count > 1) DGVSaleDetails.Columns[1].Width = 100; // PurchaseCost
-                if (DGVSaleDetails.Columns.Count > 2) DGVSaleDetails.Columns[2].Width = 100; // SalePrice
-                if (DGVSaleDetails.Columns.Count > 3) DGVSaleDetails.Columns[3].Width = 100; // TotalPurchasedQuantity
-                if (DGVSaleDetails.Columns.Count > 4) DGVSaleDetails.Columns[4].Width = 100; // TotalSoldQuantity
-                if (DGVSaleDetails.Columns.Count > 5) DGVSaleDetails.Columns[5].Width = 100; // CurrentAvailableQuantity
-                if (DGVSaleDetails.Columns.Count > 6) DGVSaleDetails.Columns[6].Width = 100; // TotalSoldPrice
-                if (DGVSaleDetails.Columns.Count > 7) DGVSaleDetails.Columns[7].Width = 100; // TotalPaidAmount
-                if (DGVSaleDetails.Columns.Count > 8) DGVSaleDetails.Columns[8].Width = 100; // TotalDue
-                if (DGVSaleDetails.Columns.Count > 9) DGVSaleDetails.Columns[9].Width = 100; // WouldBeProfit
-                if (DGVSaleDetails.Columns.Count > 10) DGVSaleDetails.Columns[10].Width = 100; // CurrentProfit
-                if (DGVSaleDetails.Columns.Count > 11) DGVSaleDetails.Columns[11].Width = 100; // CurrentProfit
-
-                // Set alignment for all other columns (center aligned)
-                for (int i = 1; i < DGVSaleDetails.Columns.Count; i++)
-                {
-                    DGVSaleDetails.Columns[i].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                }
-            }
         }
-
-        private void btnMoreDetails_Click(object sender, EventArgs e)
-        {
-            FormManager.OpenForm(this, typeof(AdminMoreSaleDetails));
-        }
-
-        private void btnAllDetails_Click(object sender, EventArgs e)
-        {
-            FormManager.OpenForm(this, typeof(AdminAllSaleDetails));
-        }
-
-
 
         private void btnPdf_Click(object sender, EventArgs e)
         {
-
             try
             {
                 SaveFileDialog saveFileDialog1 = new SaveFileDialog
@@ -262,8 +170,7 @@ namespace InventoryManagementSystem
                         // Set custom column widths (relative scale)
                         float[] columnWidths = new float[]
                         {
-                    3f, 14f, 8f, 7f, 7f, 7f, 7f, 7f,
-                    7f, 7f, 7f, 7f, 6f, 6f
+                    3f, 3f, 15f, 5f, 5f,5f,5f,5f,5f,5f,5f,5f,5f,5f,5f,5f,5f,5f
                         };
 
                         if (columnWidths.Length == DGVSaleDetails.ColumnCount)
@@ -355,7 +262,7 @@ namespace InventoryManagementSystem
                     Excel.Worksheet sheet = (Excel.Worksheet)excelApp.ActiveSheet;
 
                     // Title
-                    sheet.Cells[1, 1] = "Sale Details";
+                    sheet.Cells[1, 1] = "More Sale Details";
                     Excel.Range titleRange = sheet.Range[sheet.Cells[1, 1], sheet.Cells[1, DGVSaleDetails.Columns.Count]];
                     titleRange.Merge();
                     titleRange.Font.Bold = true;
@@ -403,7 +310,7 @@ namespace InventoryManagementSystem
                     allRows.RowHeight = 25;
 
                     // ✅ Set specific column widths for 14 columns
-                    double[] colWidths = { 10, 35, 15, 15, 12, 12, 11, 11, 11, 15, 15, 15, 15, 15 };
+                    double[] colWidths = { 10, 10, 35, 15, 15, 12, 10, 10, 10, 10, 10, 12, 15, 15, 15, 15, 15, 18 };
                     for (int i = 0; i < colWidths.Length && i < DGVSaleDetails.Columns.Count; i++)
                     {
                         ((Excel.Range)sheet.Columns[i + 1]).ColumnWidth = colWidths[i];
@@ -413,7 +320,6 @@ namespace InventoryManagementSystem
                     sheet.SaveAs(fileName);
                     excelApp.Quit();
 
-                    MessageBox.Show("Excel file generated successfully!");
                     excelCounter++;
                 }
             }
@@ -422,7 +328,6 @@ namespace InventoryManagementSystem
                 MessageBox.Show("An error occurred: " + ex.Message);
             }
         }
-
 
         private void btnPrint_Click(object sender, EventArgs e)
         {
@@ -513,25 +418,30 @@ namespace InventoryManagementSystem
                     LineAlignment = StringAlignment.Center
                 };
                 RectangleF titleRect = new RectangleF(e.MarginBounds.Left, e.MarginBounds.Top, printableWidth, titleHeight);
-                e.Graphics.DrawString("Sale Details", titleFont, blackBrush, titleRect, titleFormat);
+                e.Graphics.DrawString("More Sale Details", titleFont, blackBrush, titleRect, titleFormat);
             }
 
             // Calculate column widths (same as before)
             float[] columnWidthPercentages = new float[DGVSaleDetails.ColumnCount];
             // Column width configuration for 14 columns
-            if (DGVSaleDetails.ColumnCount >= 1) columnWidthPercentages[0] = 5f;   // 5% for column 1
-            if (DGVSaleDetails.ColumnCount >= 2) columnWidthPercentages[1] = 20f;  // 10% for column 2
-            if (DGVSaleDetails.ColumnCount >= 3) columnWidthPercentages[2] = 8f;  // 10% for column 3
-            if (DGVSaleDetails.ColumnCount >= 4) columnWidthPercentages[3] = 7f;   // 8% for column 4
-            if (DGVSaleDetails.ColumnCount >= 5) columnWidthPercentages[4] = 8f;   // 8% for column 5
-            if (DGVSaleDetails.ColumnCount >= 6) columnWidthPercentages[5] = 7f;   // 7% for column 6
-            if (DGVSaleDetails.ColumnCount >= 7) columnWidthPercentages[6] = 7f;   // 7% for column 7
-            if (DGVSaleDetails.ColumnCount >= 8) columnWidthPercentages[7] = 7f;   // 7% for column 8
-            if (DGVSaleDetails.ColumnCount >= 9) columnWidthPercentages[8] = 7f;   // 6% for column 9
-            if (DGVSaleDetails.ColumnCount >= 10) columnWidthPercentages[9] = 8f;  // 6% for column 10
-            if (DGVSaleDetails.ColumnCount >= 11) columnWidthPercentages[10] = 8f; // 5% for column 11
-            if (DGVSaleDetails.ColumnCount >= 12) columnWidthPercentages[11] = 8f; // 5% for column 12
-
+            if (DGVSaleDetails.ColumnCount >= 1) columnWidthPercentages[0] = 3f;   // 5% for column 1
+            if (DGVSaleDetails.ColumnCount >= 2) columnWidthPercentages[1] = 3f;  // 5% for column 2
+            if (DGVSaleDetails.ColumnCount >= 3) columnWidthPercentages[2] = 15f;  // 15% for column 3
+            if (DGVSaleDetails.ColumnCount >= 4) columnWidthPercentages[3] = 6f;   // 5% for column 4
+            if (DGVSaleDetails.ColumnCount >= 5) columnWidthPercentages[4] = 6f;   // 5% for column 5
+            if (DGVSaleDetails.ColumnCount >= 6) columnWidthPercentages[5] = 5f;   // 5% for column 6
+            if (DGVSaleDetails.ColumnCount >= 7) columnWidthPercentages[6] = 5f;   // 5% for column 7
+            if (DGVSaleDetails.ColumnCount >= 8) columnWidthPercentages[7] = 4f;   // 5% for column 8
+            if (DGVSaleDetails.ColumnCount >= 9) columnWidthPercentages[8] = 4f;   // 5% for column 9
+            if (DGVSaleDetails.ColumnCount >= 10) columnWidthPercentages[9] = 4f;  // 5% for column 10
+            if (DGVSaleDetails.ColumnCount >= 11) columnWidthPercentages[10] = 4f; // 5% for column 11
+            if (DGVSaleDetails.ColumnCount >= 12) columnWidthPercentages[11] = 4f; // 5% for column 12
+            if (DGVSaleDetails.ColumnCount >= 13) columnWidthPercentages[12] = 6f; // 5% for column 13
+            if (DGVSaleDetails.ColumnCount >= 14) columnWidthPercentages[13] = 6f; // 5% for column 14
+            if (DGVSaleDetails.ColumnCount >= 15) columnWidthPercentages[14] = 6f; // 5% for column 11
+            if (DGVSaleDetails.ColumnCount >= 16) columnWidthPercentages[15] = 6f; // 5% for column 12
+            if (DGVSaleDetails.ColumnCount >= 17) columnWidthPercentages[16] = 6f; // 5% for column 13
+            if (DGVSaleDetails.ColumnCount >= 18) columnWidthPercentages[17] = 7f; // 5% for column 14
 
             // Make sure the total adds up to 100% (currently sums to 100%)
             float totalPercentage = columnWidthPercentages.Sum();
@@ -599,25 +509,12 @@ namespace InventoryManagementSystem
                     else
                         e.Graphics.FillRectangle(bisqueBrush, cellRect);
 
-                    // Create string format with proper alignment
+                    // Draw text
                     StringFormat cellFormat = new StringFormat
                     {
+                        Alignment = StringAlignment.Center,
                         LineAlignment = StringAlignment.Center
                     };
-
-                    // Set horizontal alignment based on column index
-                    if (i == 0) // First column (ProductInfo)
-                    {
-                        cellFormat.Alignment = StringAlignment.Near; // Left align
-                                                                     // Add some padding for left-aligned text
-                        cellFormat.FormatFlags = StringFormatFlags.NoWrap;
-                        cellFormat.Trimming = StringTrimming.EllipsisCharacter;
-                    }
-                    else
-                    {
-                        cellFormat.Alignment = StringAlignment.Center; // Center align
-                    }
-
                     e.Graphics.DrawString(DGVSaleDetails.Rows[i].Cells[j].Value?.ToString() ?? "", rowFont, blackBrush, cellRect, cellFormat);
 
                     // Draw border
@@ -648,6 +545,16 @@ namespace InventoryManagementSystem
             titleFont.Dispose();
             headerFont.Dispose();
             rowFont.Dispose();
+        }
+
+        private void AddProductPurchaseDetails_VisibleChanged(object sender, EventArgs e)
+        {
+
+            if (this.Visible)
+            {
+                // Re-populate the DataGridView when the form becomes visible
+                PopulateMoreSaleDetailsData();
+            }
         }
     }
 }

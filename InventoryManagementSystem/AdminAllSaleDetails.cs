@@ -2,148 +2,120 @@
 using iTextSharp.text.pdf;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data;
-using System.Data.SqlClient;
 using System.Drawing;
 using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Xml.Linq;
-using ZXing.OneD;
 using Excel = Microsoft.Office.Interop.Excel;
 
 namespace InventoryManagementSystem
 {
-    public partial class AdminSaleDetails : Form
+    public partial class AdminAllSaleDetails : Form
     {
-        DataAccess db;
         private int pdfCounter = 1; // Counter to track the number of generated PDFs
         int excelCounter = 1;
         private int currentRowIndex = 0; // Add this class-level variable to track current row position
 
-        public AdminSaleDetails()
+
+        DataAccess db;
+        public AdminAllSaleDetails()
         {
-            db = new DataAccess();
             InitializeComponent();
             ExtraDesign();
-            PopulateSaleDetailData(); // Load all data initially
+            db = new DataAccess();
+            PopulateAllSaleDetailData();
+            ApplySaleDetailsLayout();
         }
 
-        public void ExtraDesign()
-        {
-            DGVSaleDetails.RowTemplate.Height = 35; // Example height in pixels
 
-            DGVSaleDetails.RowsDefaultCellStyle.BackColor = Color.LightSkyBlue; // Default row color
-            DGVSaleDetails.AlternatingRowsDefaultCellStyle.BackColor = Color.Bisque; // Alternate row color
 
-            DGVSaleDetails.RowsDefaultCellStyle.SelectionBackColor = Color.DarkBlue; // Background color for selected row
-            DGVSaleDetails.RowsDefaultCellStyle.SelectionForeColor = Color.White;   // Foreground color for selected row
-        }
+        private void PopulateAllSaleDetailData(string query = @"
+               SELECT 
+                -- Identification
+                s.SaleId,
 
-        private void PopulateSaleDetailData(string filter="")
+                -- Combined Customer Info
+                CAST(c.CustomerId AS NVARCHAR(50)) + ' - ' + c.CustomerName AS CustomerInfo,
+
+                -- Combined Product Info
+                CAST(p.ProductId AS NVARCHAR(50)) + ' - ' + 
+                p.ProductName + ' - ' + 
+                cat.CategoryName + ' - ' + 
+                b.BrandName AS ProductInfo,
+
+                -- Pricing & Cost
+                p.PurchaseCost,
+                p.SalePrice,
+                sd.UnitPrice AS ActualSoldPrice,
+                sd.SaleQuantity,
+                (p.SalePrice * sd.SaleQuantity) AS SaleValue,
+                CAST(ROUND(( (p.SalePrice - sd.UnitPrice) * sd.SaleQuantity ), 2) AS DECIMAL(18,2)) AS EachDiscount,  -- FIXED
+                (sd.UnitPrice * sd.SaleQuantity) AS EachSoldPrice,
+
+                -- Payment & Discount (per product line)
+                CAST(ROUND((sd.UnitPrice * sd.SaleQuantity * s.PaidAmount) / NULLIF(gross.SaleGross, 0), 3) AS DECIMAL(18,3)) AS EachSoldPaidAmount,
+
+                -- Each Sold Due (EachSoldPrice - EachSoldPaidAmount)
+                CAST(ROUND((sd.UnitPrice * sd.SaleQuantity) - ((sd.UnitPrice * sd.SaleQuantity * s.PaidAmount) / NULLIF(gross.SaleGross, 0)), 3) AS DECIMAL(18,3)) AS EachSoldDueAmount,
+    
+                -- Sale summary
+                s.PayAmount AS SaleTotalAmount,
+                s.PaidAmount AS SaleTotalPaidAmount,
+                ISNULL(cd.DueAmount, 0) AS SaleDueAmount,  
+                ISNULL(total_due.TotalDueAmount, 0) AS TotalDueAmount,
+
+                -- Profit
+                ((sd.UnitPrice * sd.SaleQuantity) - (sd.SaleQuantity * p.PurchaseCost)) AS WouldBeProfit,
+                ROUND(
+                    ((sd.UnitPrice * sd.SaleQuantity * s.PaidAmount) / NULLIF(gross.SaleGross, 0))
+                    - ((sd.SaleQuantity * p.PurchaseCost * s.PaidAmount) / NULLIF(gross.SaleGross, 0)),
+                2) AS CurrentProfit,
+
+                -- Transaction
+                s.TransactionType,
+                s.SaleDate
+
+            FROM SaleTable s
+            INNER JOIN CustomerTable c ON s.CustomerId = c.CustomerId
+            INNER JOIN SaleDetailTable sd ON s.SaleId = sd.SaleId
+            INNER JOIN ProductTable p ON sd.ProductId = p.ProductId
+            INNER JOIN CategoryTable cat ON p.CategoryId = cat.CategoryId
+            INNER JOIN BrandTable b ON p.BrandId = b.BrandId
+
+            -- Per-sale gross to allocate PaidAmount proportionally
+            CROSS APPLY (
+                SELECT SUM(sd2.UnitPrice * sd2.SaleQuantity) AS SaleGross
+                FROM SaleDetailTable sd2
+                WHERE sd2.SaleId = s.SaleId
+            ) gross
+
+            -- Specific sale due amount
+            LEFT JOIN CustomerDueTable cd 
+                ON s.SaleId = cd.SaleId 
+                AND s.CustomerId = cd.CustomerId
+
+            -- Total due for the customer
+            LEFT JOIN (
+                SELECT CustomerId, SUM(DueAmount) AS TotalDueAmount
+                FROM CustomerDueTable
+                GROUP BY CustomerId
+            ) total_due 
+                ON s.CustomerId = total_due.CustomerId
+
+            ORDER BY s.SaleDate DESC, s.SaleId, ProductInfo;
+
+            ")
         {
             try
             {
-
-                string query = @"
-                           SELECT 
-                            -- Concatenated column
-                            CAST(p.ProductId AS NVARCHAR(50)) + ' - ' + 
-                            p.ProductName + ' - ' + 
-                            cat.CategoryName + ' - ' + 
-                            b.BrandName AS ProductInfo,
-
-                            -- Other columns
-                            p.PurchaseCost,
-                            p.SalePrice,
-                            ISNULL(purchase_summary.TotalPurchasedQuantity, 0) AS TotalPurchasedQuantity,
-                            ISNULL(sale_summary.TotalSoldQuantity, 0) AS TotalSoldQuantity,
-                            (ISNULL(purchase_summary.TotalPurchasedQuantity, 0) - 
-                                ISNULL(sale_summary.TotalSoldQuantity, 0) - 
-                                ISNULL(damage_summary.TotalDamagedQuantity, 0) + 
-                                ISNULL(return_summary.TotalReturnedQuantity, 0)) AS CurrentAvailableQuantity,
-                          --  (p.SalePrice * ISNULL(sale_summary.TotalSoldQuantity, 0)) AS TotalSaleValue, -- hidden
-                          --  ISNULL(sale_summary.TotalDiscount, 0) AS TotalDiscount,
-                            ISNULL(sale_summary.TotalSoldPrice, 0) AS TotalSoldPrice,
-                            ISNULL(sale_summary.TotalPaidAmount, 0) AS TotalPaidAmount,
-                            (ISNULL(sale_summary.TotalSoldPrice, 0) - ISNULL(sale_summary.TotalPaidAmount, 0)) AS TotalDue,
-                            (ISNULL(sale_summary.TotalSoldPrice, 0) - 
-                                (ISNULL(sale_summary.TotalSoldQuantity, 0) * p.PurchaseCost)) AS WouldBeProfit,
-                            ISNULL(sale_summary.CurrentProfit, 0) AS CurrentProfit
-                        FROM ProductTable p
-                        INNER JOIN CategoryTable cat ON p.CategoryId = cat.CategoryId
-                        INNER JOIN BrandTable b ON p.BrandId = b.BrandId
-                    -- Purchase Summary
-                    LEFT JOIN (
-                        SELECT 
-                            pd.ProductId,
-                            SUM(pd.Quantity) AS TotalPurchasedQuantity
-                        FROM PurchaseDetailTable pd
-                        GROUP BY pd.ProductId
-                    ) purchase_summary ON p.ProductId = purchase_summary.ProductId
-                    -- Enhanced Sale Summary with Financial Calculations and Current Profit (Aggregated per Product)
-                    LEFT JOIN (
-                        SELECT 
-                            sd.ProductId,
-                            SUM(sd.SaleQuantity) AS TotalSoldQuantity,
-                            SUM(sd.UnitPrice * sd.SaleQuantity) AS TotalSoldPrice,
-                            CAST(SUM((p.SalePrice - sd.UnitPrice) * sd.SaleQuantity) AS DECIMAL(18,2)) AS TotalDiscount,
-                            CAST(SUM(sd.UnitPrice * sd.SaleQuantity * s.PaidAmount / NULLIF(s.PayAmount, 0)) AS DECIMAL(18,2)) AS TotalPaidAmount,
-                            -- Current Profit Calculation (based on your second query)
-                            CAST(
-                                SUM(
-                                    (sd.UnitPrice * sd.SaleQuantity * s.PaidAmount / NULLIF(s.PayAmount, 0)) 
-                                    - (p.PurchaseCost * sd.SaleQuantity)
-                                ) AS DECIMAL(18,2)
-                            ) AS CurrentProfit
-                        FROM SaleDetailTable sd
-                        INNER JOIN SaleTable s ON sd.SaleId = s.SaleId
-                        INNER JOIN ProductTable p ON sd.ProductId = p.ProductId
-                        GROUP BY sd.ProductId
-                    ) sale_summary ON p.ProductId = sale_summary.ProductId
-                    -- Return Summary
-                    LEFT JOIN (
-                        SELECT 
-                            rd.ProductId,
-                            SUM(rd.ReturnQuantity) AS TotalReturnedQuantity
-                        FROM ReturnDetailTable rd
-                        GROUP BY rd.ProductId
-                    ) return_summary ON p.ProductId = return_summary.ProductId
-                    -- Damage Summary
-                    LEFT JOIN (
-                        SELECT 
-                            dd.ProductId,
-                            SUM(dd.DamageQuantity) AS TotalDamagedQuantity
-                        FROM DamageDetailTable dd
-                        GROUP BY dd.ProductId
-                    ) damage_summary ON p.ProductId = damage_summary.ProductId
-
-           ";
-
-                // Add search condition if filter is provided
-                if (!string.IsNullOrEmpty(filter))
-                {
-                    query += @"
-                WHERE 
-                    CAST(p.ProductId AS NVARCHAR) LIKE @filter OR
-                    p.ProductName LIKE @filter OR
-                    cat.CategoryName LIKE @filter OR
-                    b.BrandName LIKE @filter
-                    ";
-                }
-
-                query += "ORDER BY p.ProductId;";
-
-
                 if (db != null)
                 {
-                    var parameters = new List<SqlParameter>
-                    {
-                        new SqlParameter("@filter", $"{filter}%")
-                    };
-
-                    var ds = this.db.ExecuteQuery(query, parameters.ToArray());
+                    var ds = this.db.ExecuteQuery(query);
                     this.DGVSaleDetails.AutoGenerateColumns = true;
                     this.DGVSaleDetails.DataSource = ds.Tables[0];
                 }
@@ -158,58 +130,96 @@ namespace InventoryManagementSystem
             }
         }
 
-        private void txtSearchBar_TextChanged(object sender, EventArgs e)
+
+        // Call this AFTER you set DataSource, or in DataBindingComplete
+        void ApplySaleDetailsLayout()
         {
-            PopulateSaleDetailData(txtSearchBar.Text.Trim());
+            DGVSaleDetails.ScrollBars = ScrollBars.Both;
+            DGVSaleDetails.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+
+            var widths = new Dictionary<string, int>
+            {
+                ["SaleId"] = 70,
+                ["CustomerInfo"] = 170,
+                ["ProductInfo"] = 450,
+
+
+                ["PurchaseCost"] = 120,
+                ["SalePrice"] = 120,
+                ["ActualSoldPrice"] = 120,
+                ["SaleQuantity"] = 120,
+                ["SaleValue"] = 120,
+                ["EachDiscount"] = 120,
+                
+                ["EachSoldPrice"] = 130,
+                ["EachSoldPaidAmount"] = 120,
+                ["EachSoldDueAmount"] = 120,
+
+
+                ["SaleTotalAmount"] = 130,
+                ["SaleTotalPaidAmount"] = 130,
+                ["SaleDueAmount"] = 130,
+                ["TotalDueAmount"] = 130,
+                
+
+                ["WouldBeProfit"] = 130,
+                ["CurrentProfit"] = 130,
+
+                ["TransactionType"] = 120,
+                ["SaleDate"] = 160
+
+                
+            };
+
+            foreach (var kv in widths)
+                if (DGVSaleDetails.Columns.Contains(kv.Key))
+                {
+                    var col = DGVSaleDetails.Columns[kv.Key];
+                    col.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                    col.Width = kv.Value;
+                }
+
+            // Optional precise formats you asked for earlier:
+            if (DGVSaleDetails.Columns.Contains("LinePaidAmount"))
+                DGVSaleDetails.Columns["LinePaidAmount"].DefaultCellStyle.Format = "0.000";
+            if (DGVSaleDetails.Columns.Contains("LineDiscount"))
+                DGVSaleDetails.Columns["LineDiscount"].DefaultCellStyle.Format = "0.00";
         }
+
+
+
+        public void ExtraDesign()
+        {
+            DGVSaleDetails.RowTemplate.Height = 35; // Example height in pixels
+
+            DGVSaleDetails.RowsDefaultCellStyle.BackColor = Color.LightSkyBlue; // Default row color
+            DGVSaleDetails.AlternatingRowsDefaultCellStyle.BackColor = Color.Bisque; // Alternate row color
+
+            DGVSaleDetails.RowsDefaultCellStyle.SelectionBackColor = Color.DarkBlue; // Background color for selected row
+            DGVSaleDetails.RowsDefaultCellStyle.SelectionForeColor = Color.White;   // Foreground color for selected row
+
+            DGVSaleDetails.SuspendLayout();
+
+
+            DGVSaleDetails.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+
+        }
+
+
+
 
         private void btnBack_Click(object sender, EventArgs e)
         {
             FormManager.OpenForm(this, typeof(AdminMainDashBoard));
         }
 
+
         private void DGVSaleDetails_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
         {
             DGVSaleDetails.ClearSelection();
             DGVSaleDetails.CurrentCell = null;
-
-            // Set column alignments and widths
-            if (DGVSaleDetails.Columns.Count > 0)
-            {
-                // First column (ProductInfo) - left aligned
-                DGVSaleDetails.Columns[0].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
-                DGVSaleDetails.Columns[0].Width = 400; // ProductInfo column width
-
-                // All other columns - center aligned with specific widths
-                if (DGVSaleDetails.Columns.Count > 1) DGVSaleDetails.Columns[1].Width = 100; // PurchaseCost
-                if (DGVSaleDetails.Columns.Count > 2) DGVSaleDetails.Columns[2].Width = 100; // SalePrice
-                if (DGVSaleDetails.Columns.Count > 3) DGVSaleDetails.Columns[3].Width = 100; // TotalPurchasedQuantity
-                if (DGVSaleDetails.Columns.Count > 4) DGVSaleDetails.Columns[4].Width = 100; // TotalSoldQuantity
-                if (DGVSaleDetails.Columns.Count > 5) DGVSaleDetails.Columns[5].Width = 100; // CurrentAvailableQuantity
-                if (DGVSaleDetails.Columns.Count > 6) DGVSaleDetails.Columns[6].Width = 100; // TotalSoldPrice
-                if (DGVSaleDetails.Columns.Count > 7) DGVSaleDetails.Columns[7].Width = 100; // TotalPaidAmount
-                if (DGVSaleDetails.Columns.Count > 8) DGVSaleDetails.Columns[8].Width = 100; // TotalDue
-                if (DGVSaleDetails.Columns.Count > 9) DGVSaleDetails.Columns[9].Width = 100; // WouldBeProfit
-                if (DGVSaleDetails.Columns.Count > 10) DGVSaleDetails.Columns[10].Width = 100; // CurrentProfit
-                if (DGVSaleDetails.Columns.Count > 11) DGVSaleDetails.Columns[11].Width = 100; // CurrentProfit
-
-                // Set alignment for all other columns (center aligned)
-                for (int i = 1; i < DGVSaleDetails.Columns.Count; i++)
-                {
-                    DGVSaleDetails.Columns[i].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                }
-            }
         }
 
-        private void btnMoreDetails_Click(object sender, EventArgs e)
-        {
-            FormManager.OpenForm(this, typeof(AdminMoreSaleDetails));
-        }
-
-        private void btnAllDetails_Click(object sender, EventArgs e)
-        {
-            FormManager.OpenForm(this, typeof(AdminAllSaleDetails));
-        }
 
 
 
@@ -222,7 +232,7 @@ namespace InventoryManagementSystem
                 {
                     Filter = "PDF files (*.pdf)|*.pdf|All files (*.*)|*.*",
                     Title = "Save PDF File",
-                    FileName = $"Sale_Details_{pdfCounter}_{DateTime.Now:dd-MM-yyyy_hh_mm_tt}.pdf"
+                    FileName = $"All Sale_Details_{pdfCounter}_{DateTime.Now:dd-MM-yyyy_hh_mm_tt}.pdf"
                 };
 
                 if (saveFileDialog1.ShowDialog() == DialogResult.OK)
@@ -243,7 +253,7 @@ namespace InventoryManagementSystem
 
                         // Title (only on first page)
                         var titleFont = new iTextSharp.text.Font(iTextSharp.text.Font.FontFamily.HELVETICA, 10, iTextSharp.text.Font.NORMAL);
-                        Paragraph title = new Paragraph("Sale Details", titleFont)
+                        Paragraph title = new Paragraph("All Sale Details", titleFont)
                         {
                             Alignment = Element.ALIGN_CENTER,
                             SpacingAfter = 10
@@ -262,8 +272,10 @@ namespace InventoryManagementSystem
                         // Set custom column widths (relative scale)
                         float[] columnWidths = new float[]
                         {
-                    3f, 14f, 8f, 7f, 7f, 7f, 7f, 7f,
-                    7f, 7f, 7f, 7f, 6f, 6f
+                            4f, 10f, 4f, 12f, 8f, 8f,
+                            8f, 8f,8f, 8f,8f, 8f,
+                            8f, 8f,8f, 8f,8f, 8f,
+                            8f, 8f,8f, 8f,8f, 8f
                         };
 
                         if (columnWidths.Length == DGVSaleDetails.ColumnCount)
@@ -342,7 +354,7 @@ namespace InventoryManagementSystem
                 {
                     Filter = "Excel files (*.xlsx)|*.xlsx|All files (*.*)|*.*",
                     Title = "Save Excel File",
-                    FileName = $"Sale_Details_{excelCounter}_{DateTime.Now:yyyy-MM-dd_hh-mm-tt}.xlsx"
+                    FileName = $"All_Sale_Details_{excelCounter}_{DateTime.Now:yyyy-MM-dd_hh-mm-tt}.xlsx"
                 };
 
                 if (saveFileDialog1.ShowDialog() == DialogResult.OK)
@@ -355,7 +367,7 @@ namespace InventoryManagementSystem
                     Excel.Worksheet sheet = (Excel.Worksheet)excelApp.ActiveSheet;
 
                     // Title
-                    sheet.Cells[1, 1] = "Sale Details";
+                    sheet.Cells[1, 1] = "All Sale Details";
                     Excel.Range titleRange = sheet.Range[sheet.Cells[1, 1], sheet.Cells[1, DGVSaleDetails.Columns.Count]];
                     titleRange.Merge();
                     titleRange.Font.Bold = true;
@@ -403,7 +415,7 @@ namespace InventoryManagementSystem
                     allRows.RowHeight = 25;
 
                     // ✅ Set specific column widths for 14 columns
-                    double[] colWidths = { 10, 35, 15, 15, 12, 12, 11, 11, 11, 15, 15, 15, 15, 15 };
+                    double[] colWidths = { 10, 25, 15, 35, 12, 12, 11, 11, 11, 15, 15, 15, 15, 15, 12, 12, 11, 11, 11, 15, 20, 15, 15, 15 };
                     for (int i = 0; i < colWidths.Length && i < DGVSaleDetails.Columns.Count; i++)
                     {
                         ((Excel.Range)sheet.Columns[i + 1]).ColumnWidth = colWidths[i];
@@ -413,7 +425,6 @@ namespace InventoryManagementSystem
                     sheet.SaveAs(fileName);
                     excelApp.Quit();
 
-                    MessageBox.Show("Excel file generated successfully!");
                     excelCounter++;
                 }
             }
@@ -492,9 +503,9 @@ namespace InventoryManagementSystem
             int lastRow = Math.Min(currentRowIndex + rowsPerPage, DGVSaleDetails.Rows.Count);
 
             // Create fonts to match PDF
-            System.Drawing.Font titleFont = new System.Drawing.Font("Helvetica", 10, FontStyle.Regular);
-            System.Drawing.Font headerFont = new System.Drawing.Font("Helvetica", 10, FontStyle.Regular);
-            System.Drawing.Font rowFont = new System.Drawing.Font("Helvetica", 12, FontStyle.Regular);
+            System.Drawing.Font titleFont = new System.Drawing.Font("Helvetica", 8, FontStyle.Regular);
+            System.Drawing.Font headerFont = new System.Drawing.Font("Helvetica", 8, FontStyle.Regular);
+            System.Drawing.Font rowFont = new System.Drawing.Font("Helvetica", 10, FontStyle.Regular);
 
             // Create brushes with exact colors to match PDF
             Brush darkGrayBrush = new SolidBrush(Color.FromArgb(64, 64, 64)); // PDF DARK_GRAY
@@ -513,25 +524,36 @@ namespace InventoryManagementSystem
                     LineAlignment = StringAlignment.Center
                 };
                 RectangleF titleRect = new RectangleF(e.MarginBounds.Left, e.MarginBounds.Top, printableWidth, titleHeight);
-                e.Graphics.DrawString("Sale Details", titleFont, blackBrush, titleRect, titleFormat);
+                e.Graphics.DrawString("All Sale Details", titleFont, blackBrush, titleRect, titleFormat);
             }
 
             // Calculate column widths (same as before)
             float[] columnWidthPercentages = new float[DGVSaleDetails.ColumnCount];
             // Column width configuration for 14 columns
-            if (DGVSaleDetails.ColumnCount >= 1) columnWidthPercentages[0] = 5f;   // 5% for column 1
-            if (DGVSaleDetails.ColumnCount >= 2) columnWidthPercentages[1] = 20f;  // 10% for column 2
-            if (DGVSaleDetails.ColumnCount >= 3) columnWidthPercentages[2] = 8f;  // 10% for column 3
-            if (DGVSaleDetails.ColumnCount >= 4) columnWidthPercentages[3] = 7f;   // 8% for column 4
-            if (DGVSaleDetails.ColumnCount >= 5) columnWidthPercentages[4] = 8f;   // 8% for column 5
-            if (DGVSaleDetails.ColumnCount >= 6) columnWidthPercentages[5] = 7f;   // 7% for column 6
-            if (DGVSaleDetails.ColumnCount >= 7) columnWidthPercentages[6] = 7f;   // 7% for column 7
-            if (DGVSaleDetails.ColumnCount >= 8) columnWidthPercentages[7] = 7f;   // 7% for column 8
-            if (DGVSaleDetails.ColumnCount >= 9) columnWidthPercentages[8] = 7f;   // 6% for column 9
-            if (DGVSaleDetails.ColumnCount >= 10) columnWidthPercentages[9] = 8f;  // 6% for column 10
-            if (DGVSaleDetails.ColumnCount >= 11) columnWidthPercentages[10] = 8f; // 5% for column 11
-            if (DGVSaleDetails.ColumnCount >= 12) columnWidthPercentages[11] = 8f; // 5% for column 12
-
+            if (DGVSaleDetails.ColumnCount >= 1) columnWidthPercentages[0] = 3f;   // 5% for column 1
+            if (DGVSaleDetails.ColumnCount >= 2) columnWidthPercentages[1] = 7f;  // 10% for column 2
+            if (DGVSaleDetails.ColumnCount >= 3) columnWidthPercentages[2] = 3f;  // 10% for column 3
+            if (DGVSaleDetails.ColumnCount >= 4) columnWidthPercentages[3] = 9f;   // 8% for column 4
+            if (DGVSaleDetails.ColumnCount >= 5) columnWidthPercentages[4] = 4f;   // 8% for column 5
+            if (DGVSaleDetails.ColumnCount >= 6) columnWidthPercentages[5] = 4f;   // 7% for column 6
+            if (DGVSaleDetails.ColumnCount >= 7) columnWidthPercentages[6] = 3f;   // 7% for column 7
+            if (DGVSaleDetails.ColumnCount >= 8) columnWidthPercentages[7] = 3f;   // 7% for column 8
+            if (DGVSaleDetails.ColumnCount >= 9) columnWidthPercentages[8] = 3f;   // 6% for column 9
+            if (DGVSaleDetails.ColumnCount >= 10) columnWidthPercentages[9] = 3f;  // 6% for column 10
+            if (DGVSaleDetails.ColumnCount >= 11) columnWidthPercentages[10] = 4f; // 5% for column 11
+            if (DGVSaleDetails.ColumnCount >= 12) columnWidthPercentages[11] = 4f; // 5% for column 12
+            if (DGVSaleDetails.ColumnCount >= 13) columnWidthPercentages[12] = 4f; // 5% for column 13
+            if (DGVSaleDetails.ColumnCount >= 14) columnWidthPercentages[13] = 4f; // 5% for column 14
+            if (DGVSaleDetails.ColumnCount >= 15) columnWidthPercentages[14] = 4f;   // 8% for column 5
+            if (DGVSaleDetails.ColumnCount >= 16) columnWidthPercentages[15] = 4f;   // 7% for column 6
+            if (DGVSaleDetails.ColumnCount >= 17) columnWidthPercentages[16] = 4f;   // 7% for column 7
+            if (DGVSaleDetails.ColumnCount >= 18) columnWidthPercentages[17] = 4f;   // 7% for column 8
+            if (DGVSaleDetails.ColumnCount >= 19) columnWidthPercentages[18] = 4f;   // 6% for column 9
+            if (DGVSaleDetails.ColumnCount >= 20) columnWidthPercentages[19] = 4f;  // 6% for column 10
+            if (DGVSaleDetails.ColumnCount >= 21) columnWidthPercentages[20] = 6f; // 5% for column 11
+            if (DGVSaleDetails.ColumnCount >= 22) columnWidthPercentages[21] = 4f; // 5% for column 12
+            if (DGVSaleDetails.ColumnCount >= 23) columnWidthPercentages[22] = 4f; // 5% for column 13
+            if (DGVSaleDetails.ColumnCount >= 24) columnWidthPercentages[23] = 4f; // 5% for column 14
 
             // Make sure the total adds up to 100% (currently sums to 100%)
             float totalPercentage = columnWidthPercentages.Sum();
@@ -599,25 +621,12 @@ namespace InventoryManagementSystem
                     else
                         e.Graphics.FillRectangle(bisqueBrush, cellRect);
 
-                    // Create string format with proper alignment
+                    // Draw text
                     StringFormat cellFormat = new StringFormat
                     {
+                        Alignment = StringAlignment.Center,
                         LineAlignment = StringAlignment.Center
                     };
-
-                    // Set horizontal alignment based on column index
-                    if (i == 0) // First column (ProductInfo)
-                    {
-                        cellFormat.Alignment = StringAlignment.Near; // Left align
-                                                                     // Add some padding for left-aligned text
-                        cellFormat.FormatFlags = StringFormatFlags.NoWrap;
-                        cellFormat.Trimming = StringTrimming.EllipsisCharacter;
-                    }
-                    else
-                    {
-                        cellFormat.Alignment = StringAlignment.Center; // Center align
-                    }
-
                     e.Graphics.DrawString(DGVSaleDetails.Rows[i].Cells[j].Value?.ToString() ?? "", rowFont, blackBrush, cellRect, cellFormat);
 
                     // Draw border
@@ -649,5 +658,6 @@ namespace InventoryManagementSystem
             headerFont.Dispose();
             rowFont.Dispose();
         }
+
     }
 }

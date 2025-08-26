@@ -51,17 +51,13 @@ namespace InventoryManagementSystem
                     {
                         SessionNameForAdmin = usertype;
                         SessionName = username;
-                        AdminMainDashBoard admin = new AdminMainDashBoard();
-                        admin.Show();
-                        this.Hide();
+                        FormManager.OpenForm(this, typeof(AdminMainDashBoard));
                     }
                     else if (usertype == "Salesman")
                     {
                         SessionNameForSalesman = usertype;
                         SessionName = username;
-                        SalesmanInventoryStore inventory = new SalesmanInventoryStore();
-                        inventory.Show();
-                        this.Hide();
+                        FormManager.OpenForm(this, typeof(AdminMainDashBoard));
                     }
                 }
                 else

@@ -32,10 +32,9 @@
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle3 = new System.Windows.Forms.DataGridViewCellStyle();
             this.btnPrint = new System.Windows.Forms.Button();
-            this.btnSearch2 = new System.Windows.Forms.Button();
+            this.btnSearch = new System.Windows.Forms.Button();
             this.DGVSaleDetails = new System.Windows.Forms.DataGridView();
             this.panel4 = new System.Windows.Forms.Panel();
-            this.btnSearch1 = new System.Windows.Forms.Button();
             this.label1 = new System.Windows.Forms.Label();
             this.txtSearchBar = new System.Windows.Forms.TextBox();
             this.label5 = new System.Windows.Forms.Label();
@@ -43,6 +42,9 @@
             this.dtpEndDate = new System.Windows.Forms.DateTimePicker();
             this.dtpStartDate = new System.Windows.Forms.DateTimePicker();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.btnRefresh = new System.Windows.Forms.Button();
+            this.btnExcel = new System.Windows.Forms.Button();
+            this.btnPdf = new System.Windows.Forms.Button();
             this.btnBack = new System.Windows.Forms.Button();
             this.panel2 = new System.Windows.Forms.Panel();
             this.label13 = new System.Windows.Forms.Label();
@@ -57,7 +59,7 @@
             this.btnPrint.BackColor = System.Drawing.SystemColors.Highlight;
             this.btnPrint.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnPrint.ForeColor = System.Drawing.SystemColors.Control;
-            this.btnPrint.Location = new System.Drawing.Point(681, 39);
+            this.btnPrint.Location = new System.Drawing.Point(789, 35);
             this.btnPrint.Name = "btnPrint";
             this.btnPrint.Size = new System.Drawing.Size(113, 48);
             this.btnPrint.TabIndex = 7;
@@ -65,17 +67,18 @@
             this.btnPrint.UseVisualStyleBackColor = false;
             this.btnPrint.Click += new System.EventHandler(this.btnPrint_Click);
             // 
-            // btnSearch2
+            // btnSearch
             // 
-            this.btnSearch2.BackColor = System.Drawing.SystemColors.Highlight;
-            this.btnSearch2.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnSearch2.ForeColor = System.Drawing.SystemColors.Control;
-            this.btnSearch2.Location = new System.Drawing.Point(440, 39);
-            this.btnSearch2.Name = "btnSearch2";
-            this.btnSearch2.Size = new System.Drawing.Size(113, 48);
-            this.btnSearch2.TabIndex = 6;
-            this.btnSearch2.Text = "Search";
-            this.btnSearch2.UseVisualStyleBackColor = false;
+            this.btnSearch.BackColor = System.Drawing.SystemColors.Highlight;
+            this.btnSearch.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnSearch.ForeColor = System.Drawing.SystemColors.Control;
+            this.btnSearch.Location = new System.Drawing.Point(440, 39);
+            this.btnSearch.Name = "btnSearch";
+            this.btnSearch.Size = new System.Drawing.Size(113, 48);
+            this.btnSearch.TabIndex = 6;
+            this.btnSearch.Text = "Search";
+            this.btnSearch.UseVisualStyleBackColor = false;
+            this.btnSearch.Click += new System.EventHandler(this.btnSearch_Click);
             // 
             // DGVSaleDetails
             // 
@@ -123,31 +126,18 @@
             // 
             // panel4
             // 
-            this.panel4.Controls.Add(this.btnSearch1);
             this.panel4.Controls.Add(this.label1);
             this.panel4.Controls.Add(this.txtSearchBar);
             this.panel4.Location = new System.Drawing.Point(3, 75);
             this.panel4.Name = "panel4";
-            this.panel4.Size = new System.Drawing.Size(608, 100);
+            this.panel4.Size = new System.Drawing.Size(324, 100);
             this.panel4.TabIndex = 47;
-            // 
-            // btnSearch1
-            // 
-            this.btnSearch1.BackColor = System.Drawing.SystemColors.Highlight;
-            this.btnSearch1.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnSearch1.ForeColor = System.Drawing.SystemColors.Control;
-            this.btnSearch1.Location = new System.Drawing.Point(481, 21);
-            this.btnSearch1.Name = "btnSearch1";
-            this.btnSearch1.Size = new System.Drawing.Size(113, 48);
-            this.btnSearch1.TabIndex = 44;
-            this.btnSearch1.Text = "Search";
-            this.btnSearch1.UseVisualStyleBackColor = false;
             // 
             // label1
             // 
             this.label1.AutoSize = true;
             this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label1.Location = new System.Drawing.Point(21, 29);
+            this.label1.Location = new System.Drawing.Point(11, 0);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(122, 25);
             this.label1.TabIndex = 40;
@@ -157,10 +147,11 @@
             // 
             this.txtSearchBar.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.txtSearchBar.Font = new System.Drawing.Font("Microsoft Sans Serif", 16.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.txtSearchBar.Location = new System.Drawing.Point(172, 21);
+            this.txtSearchBar.Location = new System.Drawing.Point(16, 39);
             this.txtSearchBar.Name = "txtSearchBar";
             this.txtSearchBar.Size = new System.Drawing.Size(284, 38);
             this.txtSearchBar.TabIndex = 14;
+            this.txtSearchBar.TextChanged += new System.EventHandler(this.txtSearchBar_TextChanged);
             // 
             // label5
             // 
@@ -190,7 +181,7 @@
             this.dtpEndDate.Name = "dtpEndDate";
             this.dtpEndDate.Size = new System.Drawing.Size(163, 34);
             this.dtpEndDate.TabIndex = 40;
-            this.dtpEndDate.Value = new System.DateTime(2024, 12, 21, 7, 11, 43, 0);
+            this.dtpEndDate.Value = new System.DateTime(2025, 8, 16, 0, 0, 0, 0);
             // 
             // dtpStartDate
             // 
@@ -200,32 +191,74 @@
             this.dtpStartDate.Name = "dtpStartDate";
             this.dtpStartDate.Size = new System.Drawing.Size(170, 34);
             this.dtpStartDate.TabIndex = 41;
-            this.dtpStartDate.Value = new System.DateTime(2024, 12, 21, 7, 11, 43, 0);
+            this.dtpStartDate.Value = new System.DateTime(2025, 8, 16, 0, 0, 0, 0);
             // 
             // panel1
             // 
             this.panel1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.panel1.Controls.Add(this.btnRefresh);
+            this.panel1.Controls.Add(this.btnExcel);
+            this.panel1.Controls.Add(this.btnPdf);
             this.panel1.Controls.Add(this.btnPrint);
             this.panel1.Controls.Add(this.label5);
-            this.panel1.Controls.Add(this.btnSearch2);
+            this.panel1.Controls.Add(this.btnSearch);
             this.panel1.Controls.Add(this.label2);
             this.panel1.Controls.Add(this.dtpEndDate);
             this.panel1.Controls.Add(this.dtpStartDate);
-            this.panel1.Location = new System.Drawing.Point(632, 75);
+            this.panel1.Location = new System.Drawing.Point(333, 75);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(894, 100);
+            this.panel1.Size = new System.Drawing.Size(1193, 100);
             this.panel1.TabIndex = 48;
+            // 
+            // btnRefresh
+            // 
+            this.btnRefresh.BackColor = System.Drawing.Color.MidnightBlue;
+            this.btnRefresh.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnRefresh.ForeColor = System.Drawing.SystemColors.Control;
+            this.btnRefresh.Location = new System.Drawing.Point(568, 39);
+            this.btnRefresh.Name = "btnRefresh";
+            this.btnRefresh.Size = new System.Drawing.Size(113, 48);
+            this.btnRefresh.TabIndex = 46;
+            this.btnRefresh.Text = "Refresh";
+            this.btnRefresh.UseVisualStyleBackColor = false;
+            this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
+            // 
+            // btnExcel
+            // 
+            this.btnExcel.BackColor = System.Drawing.SystemColors.Highlight;
+            this.btnExcel.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnExcel.ForeColor = System.Drawing.SystemColors.Control;
+            this.btnExcel.Location = new System.Drawing.Point(1051, 35);
+            this.btnExcel.Name = "btnExcel";
+            this.btnExcel.Size = new System.Drawing.Size(113, 48);
+            this.btnExcel.TabIndex = 45;
+            this.btnExcel.Text = "Excel";
+            this.btnExcel.UseVisualStyleBackColor = false;
+            this.btnExcel.Click += new System.EventHandler(this.btnExcel_Click);
+            // 
+            // btnPdf
+            // 
+            this.btnPdf.BackColor = System.Drawing.SystemColors.Highlight;
+            this.btnPdf.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnPdf.ForeColor = System.Drawing.SystemColors.Control;
+            this.btnPdf.Location = new System.Drawing.Point(921, 35);
+            this.btnPdf.Name = "btnPdf";
+            this.btnPdf.Size = new System.Drawing.Size(113, 48);
+            this.btnPdf.TabIndex = 43;
+            this.btnPdf.Text = "PDF";
+            this.btnPdf.UseVisualStyleBackColor = false;
+            this.btnPdf.Click += new System.EventHandler(this.btnPdf_Click);
             // 
             // btnBack
             // 
             this.btnBack.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnBack.BackColor = System.Drawing.SystemColors.Highlight;
+            this.btnBack.BackColor = System.Drawing.Color.MidnightBlue;
             this.btnBack.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnBack.ForeColor = System.Drawing.SystemColors.Control;
-            this.btnBack.Location = new System.Drawing.Point(1407, 9);
+            this.btnBack.Location = new System.Drawing.Point(1407, 6);
             this.btnBack.Name = "btnBack";
-            this.btnBack.Size = new System.Drawing.Size(113, 48);
+            this.btnBack.Size = new System.Drawing.Size(113, 54);
             this.btnBack.TabIndex = 8;
             this.btnBack.Text = "Back";
             this.btnBack.UseVisualStyleBackColor = false;
@@ -267,6 +300,8 @@
             this.Name = "AdminMoreSaleDetails";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "AdminMoreSaleDetails";
+            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
+            this.VisibleChanged += new System.EventHandler(this.AdminMoreSaleDetails_VisibleChanged);
             ((System.ComponentModel.ISupportInitialize)(this.DGVSaleDetails)).EndInit();
             this.panel4.ResumeLayout(false);
             this.panel4.PerformLayout();
@@ -280,10 +315,9 @@
 
         #endregion
         private System.Windows.Forms.Button btnPrint;
-        private System.Windows.Forms.Button btnSearch2;
+        private System.Windows.Forms.Button btnSearch;
         private System.Windows.Forms.DataGridView DGVSaleDetails;
         private System.Windows.Forms.Panel panel4;
-        private System.Windows.Forms.Button btnSearch1;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.TextBox txtSearchBar;
         private System.Windows.Forms.Label label5;
@@ -294,5 +328,8 @@
         private System.Windows.Forms.Button btnBack;
         private System.Windows.Forms.Panel panel2;
         private System.Windows.Forms.Label label13;
+        private System.Windows.Forms.Button btnExcel;
+        private System.Windows.Forms.Button btnPdf;
+        private System.Windows.Forms.Button btnRefresh;
     }
 }

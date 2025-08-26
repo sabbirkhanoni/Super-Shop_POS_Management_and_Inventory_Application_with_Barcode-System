@@ -1,18 +1,27 @@
-﻿using System;
+﻿using iTextSharp.text;
+using iTextSharp.text.pdf;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Drawing.Printing;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Excel = Microsoft.Office.Interop.Excel;
 
 namespace InventoryManagementSystem
 {
     public partial class SalesmanInventoryStore : Form
     {
         private DataAccess db;
+
+        private int pdfCounter = 1;
+        private int excelCounter = 1;
+        private int currentRowIndex = 0; // Add this class-level variable to track current row position
         public SalesmanInventoryStore()
         {
             InitializeComponent();
@@ -39,31 +48,72 @@ namespace InventoryManagementSystem
             try
             {
                 string query = @"
-        SELECT 
-            p.ProductId,
-            p.ProductName,
-            c.CategoryName,
-            b.BrandName,
-            p.SalePrice,
-            p.PurchaseCost,
-            COALESCE(SUM(pd.Quantity), 0) AS Quantity
-        FROM 
-            ProductTable p
-        LEFT JOIN 
-            CategoryTable c ON p.CategoryId = c.CategoryId
-        LEFT JOIN 
-            BrandTable b ON p.BrandId = b.BrandId
-        LEFT JOIN 
-            PurchaseDetailTable pd ON p.ProductId = pd.ProductId
-        GROUP BY 
-            p.ProductId,
-            p.ProductName,
-            c.CategoryName,
-            b.BrandName,
-            p.SalePrice,
-            p.PurchaseCost
-        HAVING 
-            COALESCE(SUM(pd.Quantity), 0) > 0";
+                 -- Inventory Display Query - Current Stock Status with Returned and Damage Quantities
+                    WITH ProductStock AS (
+                        -- Calculate total purchased per product
+                        SELECT 
+                            ProductId,
+                            SUM(Quantity) as TotalPurchased
+                        FROM PurchaseDetailTable
+                        GROUP BY ProductId
+                    ),
+                    ProductSold AS (
+                        -- Calculate total sold per product
+                        SELECT 
+                            ProductId,
+                            SUM(SaleQuantity) as TotalSold
+                        FROM SaleDetailTable
+                        GROUP BY ProductId
+                    ),
+                    ProductDamaged AS (
+                        -- Calculate total damaged per product
+                        SELECT 
+                            ProductId,
+                            SUM(DamageQuantity) as TotalDamaged
+                        FROM DamageDetailTable
+                        GROUP BY ProductId
+                    ),
+                    ProductReturned AS (
+                        -- Calculate total returned per product
+                        SELECT 
+                            ProductId,
+                            SUM(ReturnQuantity) as TotalReturned
+                        FROM ReturnDetailTable
+                        GROUP BY ProductId
+                    )
+                    SELECT 
+                        p.ProductId,
+                        p.ProductName,
+                        c.CategoryName,
+                        b.BrandName,
+                        p.PurchaseCost,
+                        p.SalePrice,
+                        -- Total Purchased Quantity
+                        ISNULL(ps.TotalPurchased, 0) AS TotalPurchased,
+                        -- Total Sold Quantity
+                        ISNULL(psold.TotalSold, 0) AS TotalSold,
+                        -- Returned Quantity (Total Returned Quantity Of That Product)
+                        ISNULL(pr.TotalReturned, 0) AS ReturnedQuantity,
+                        -- Damage Quantity (Total Damage Quantity Of That Product)
+                        ISNULL(pd.TotalDamaged, 0) AS DamageQuantity,
+                        -- Current Available Quantity
+                        (ISNULL(ps.TotalPurchased, 0) 
+                            - ISNULL(psold.TotalSold, 0) 
+                            - ISNULL(pd.TotalDamaged, 0) 
+                            + ISNULL(pr.TotalReturned, 0)) AS CurrentAvailableQuantity
+                    FROM 
+                        ProductTable p
+                        INNER JOIN CategoryTable c ON p.CategoryId = c.CategoryId
+                        INNER JOIN BrandTable b ON p.BrandId = b.BrandId
+                        LEFT JOIN ProductStock ps ON p.ProductId = ps.ProductId
+                        LEFT JOIN ProductSold psold ON p.ProductId = psold.ProductId
+                        LEFT JOIN ProductDamaged pd ON p.ProductId = pd.ProductId
+                        LEFT JOIN ProductReturned pr ON p.ProductId = pr.ProductId
+                    -- Optional filters (uncomment as needed):
+                    WHERE (ISNULL(ps.TotalPurchased, 0) - ISNULL(psold.TotalSold, 0) - ISNULL(pd.TotalDamaged, 0) + ISNULL(pr.TotalReturned, 0)) >= 0  -- Only products with stock
+                    -- WHERE (ISNULL(ps.TotalPurchased, 0) - ISNULL(psold.TotalSold, 0) - ISNULL(pd.TotalDamaged, 0) + ISNULL(pr.TotalReturned, 0)) <= 5  -- Low stock alert
+                    ORDER BY 
+                        p.ProductId DESC;";
 
                 // Apply filter if provided
                 if (!string.IsNullOrWhiteSpace(filter))
@@ -89,13 +139,10 @@ namespace InventoryManagementSystem
         }
 
 
-
-
-
         private void btnBack_Click(object sender, EventArgs e)
         {
-                SalesmanMainDashBoard salesmanMainDashBoard = new SalesmanMainDashBoard();
-                salesmanMainDashBoard.Show();
+                AdminMainDashBoard adminMainDashBoard = new AdminMainDashBoard();
+                adminMainDashBoard.Show();
                 this.Hide();
         }
 
@@ -103,62 +150,6 @@ namespace InventoryManagementSystem
         {
             DGVInventory.ClearSelection();
             DGVInventory.CurrentCell = null;
-        }
-
-
-        private void BtnSalesMainDashBoard_Click(object sender, EventArgs e)
-        {
-            SalesmanMainDashBoard salesmanMainDashBoad = new SalesmanMainDashBoard();
-            salesmanMainDashBoad.Show();
-            this.Hide();
-        }
-
-        private void btnAddProducts_Click(object sender, EventArgs e)
-        {
-            AddProducts addProducts = new AddProducts();
-            addProducts.Show();
-            this.Hide();
-        }
-
-        private void btnStockProducts_Click(object sender, EventArgs e)
-        {
-            SalesmanInventoryStore inventory = new SalesmanInventoryStore();
-            inventory.Show();
-            this.Hide();
-        }
-        private void btnAddCustomer_Click(object sender, EventArgs e)
-        {
-            AddCustomer addCustomer = new AddCustomer();
-            addCustomer.Show();
-            this.Hide();
-        }
-
-        private void btnAddSupplier_Click(object sender, EventArgs e)
-        {
-            AddSupplier addSupplier = new AddSupplier();
-            addSupplier.Show();
-            this.Hide();
-        }
-
-        private void btnLogout_Click(object sender, EventArgs e)
-        {
-            LoginForm loginForm = new LoginForm();
-            loginForm.Show();
-            this.Hide();
-        }
-
-        private void btnProductSettings_Click(object sender, EventArgs e)
-        {
-            ProductSettings productSettings = new ProductSettings();
-            productSettings.Show();
-            this.Hide();
-        }
-
-        private void btnReturnAndDamage_Click(object sender, EventArgs e)
-        {
-            ReturnProducts returnProducts = new ReturnProducts();
-            returnProducts.Show();
-            this.Hide();
         }
 
         private void txtSearch_TextChanged(object sender, EventArgs e)
@@ -171,11 +162,463 @@ namespace InventoryManagementSystem
             txtSearchBar.Clear();
         }
 
-        private void btnOthers_Click(object sender, EventArgs e)
+        private void btnBack_Click_1(object sender, EventArgs e)
         {
-            MessageBox.Show("This Feature Is Not Available For You", "Feature Not Available", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
+            FormManager.OpenForm(this, typeof(AdminMainDashBoard));
         }
 
+        private void btnSale_Click(object sender, EventArgs e)
+        {
+            FormManager.OpenForm(this, typeof(SalesmanMainDashBoard));
+        }
+
+        private void btnAddProducts_Click(object sender, EventArgs e)
+        {
+            FormManager.OpenForm(this, typeof(AddProducts));
+        }
+
+        private void btnBarcodePrintOne_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void btnBarcodePrintAll_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void btnPdf_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                SaveFileDialog saveFileDialog1 = new SaveFileDialog
+                {
+                    Filter = "PDF files (*.pdf)|*.pdf|All files (*.*)|*.*",
+                    Title = "Save PDF File",
+                    FileName = $"Sale_Details_{pdfCounter}_{DateTime.Now:dd-MM-yyyy_hh_mm_tt}.pdf"
+                };
+
+                if (saveFileDialog1.ShowDialog() == DialogResult.OK)
+                {
+                    string fileName = saveFileDialog1.FileName;
+                    using (FileStream stream = new FileStream(fileName, FileMode.Create))
+                    {
+                        // Landscape Tabloid (11" x 17")
+                        Document doc = new Document(PageSize.TABLOID.Rotate());
+                        doc.SetMargins(18f, 18f, 18f, 18f); // 0.25 inch margins (~18f)
+                        PdfWriter writer = PdfWriter.GetInstance(doc, stream);
+
+                        // Create page event helper to handle header repetition
+                        PdfPageEventHelper pageEventHelper = new PdfPageEventHelper();
+                        writer.PageEvent = pageEventHelper;
+
+                        doc.Open();
+
+                        // Title (only on first page)
+                        var titleFont = new iTextSharp.text.Font(iTextSharp.text.Font.FontFamily.HELVETICA, 10, iTextSharp.text.Font.NORMAL);
+                        Paragraph title = new Paragraph("Sale Details", titleFont)
+                        {
+                            Alignment = Element.ALIGN_CENTER,
+                            SpacingAfter = 10
+                        };
+                        doc.Add(title);
+
+                        // Create table
+                        PdfPTable pdfTable = new PdfPTable(DGVInventory.ColumnCount)
+                        {
+                            WidthPercentage = 100, // Fill page width
+                            SpacingBefore = 5,
+                            SpacingAfter = 5,
+                            HeaderRows = 1 // This makes the first row repeat on every page
+                        };
+
+                        // Set custom column widths (relative scale)
+                        float[] columnWidths = new float[]
+                        {
+                    3f, 3f, 15f, 5f, 5f,5f,5f,5f,5f,5f,5f,5f,5f,5f,5f,5f,5f,5f
+                        };
+
+                        if (columnWidths.Length == DGVInventory.ColumnCount)
+                        {
+                            pdfTable.SetWidths(columnWidths);
+                        }
+                        else
+                        {
+                            throw new Exception("Column width count does not match the number of DataGridView columns.");
+                        }
+
+                        // Header font
+                        var headerFont = new iTextSharp.text.Font(iTextSharp.text.Font.FontFamily.HELVETICA, 10, iTextSharp.text.Font.NORMAL, BaseColor.WHITE);
+
+                        // Add header cells
+                        foreach (DataGridViewColumn column in DGVInventory.Columns)
+                        {
+                            PdfPCell headerCell = new PdfPCell(new Phrase(column.HeaderText, headerFont))
+                            {
+                                BackgroundColor = BaseColor.DARK_GRAY,
+                                HorizontalAlignment = Element.ALIGN_CENTER,
+                                Padding = 5,
+                                FixedHeight = 30
+                            };
+                            pdfTable.AddCell(headerCell);
+                        }
+
+                        // Row font
+                        var rowFont = new iTextSharp.text.Font(iTextSharp.text.Font.FontFamily.HELVETICA, 12);
+
+                        // Add data rows
+                        for (int i = 0; i < DGVInventory.Rows.Count; i++)
+                        {
+                            DataGridViewRow row = DGVInventory.Rows[i];
+                            BaseColor rowColor = (i % 2 == 0) ? new BaseColor(173, 216, 230) : new BaseColor(255, 228, 196);
+
+                            foreach (DataGridViewCell cell in row.Cells)
+                            {
+                                PdfPCell pdfCell = new PdfPCell(new Phrase(cell.Value?.ToString() ?? string.Empty, rowFont))
+                                {
+                                    BackgroundColor = rowColor,
+                                    HorizontalAlignment = Element.ALIGN_CENTER,
+                                    Padding = 5,
+                                    FixedHeight = 30
+                                };
+                                pdfTable.AddCell(pdfCell);
+                            }
+                        }
+
+                        // Add table to document
+                        doc.Add(pdfTable);
+                        doc.Close();
+                    }
+
+                    MessageBox.Show("PDF file generated successfully!");
+                    pdfCounter++;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("An error occurred: " + ex.Message);
+            }
+        }
+
+        private void btnExcel_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (DGVInventory.Rows.Count == 0)
+                {
+                    MessageBox.Show("No data available to export.");
+                    return;
+                }
+
+                SaveFileDialog saveFileDialog1 = new SaveFileDialog
+                {
+                    Filter = "Excel files (*.xlsx)|*.xlsx|All files (*.*)|*.*",
+                    Title = "Save Excel File",
+                    FileName = $"Sale_Details_{excelCounter}_{DateTime.Now:yyyy-MM-dd_hh-mm-tt}.xlsx"
+                };
+
+                if (saveFileDialog1.ShowDialog() == DialogResult.OK)
+                {
+                    string fileName = saveFileDialog1.FileName;
+
+                    Excel.Application excelApp = new Excel.Application();
+                    excelApp.Workbooks.Add(Type.Missing);
+
+                    Excel.Worksheet sheet = (Excel.Worksheet)excelApp.ActiveSheet;
+
+                    // Title
+                    sheet.Cells[1, 1] = "More Sale Details";
+                    Excel.Range titleRange = sheet.Range[sheet.Cells[1, 1], sheet.Cells[1, DGVInventory.Columns.Count]];
+                    titleRange.Merge();
+                    titleRange.Font.Bold = true;
+                    titleRange.Font.Size = 12;
+                    titleRange.HorizontalAlignment = Excel.XlHAlign.xlHAlignCenter;
+                    titleRange.VerticalAlignment = Excel.XlVAlign.xlVAlignCenter;
+                    titleRange.RowHeight = 30;
+
+                    // Headers
+                    for (int i = 0; i < DGVInventory.Columns.Count; i++)
+                    {
+                        sheet.Cells[2, i + 1] = DGVInventory.Columns[i].HeaderText;
+                        Excel.Range headerCell = (Excel.Range)sheet.Cells[2, i + 1];
+                        headerCell.Font.Bold = true;
+                        headerCell.Font.Size = 12;
+                        headerCell.Interior.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.DarkGray);
+                        headerCell.Font.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.White);
+                        headerCell.HorizontalAlignment = Excel.XlHAlign.xlHAlignCenter;
+                        headerCell.VerticalAlignment = Excel.XlVAlign.xlVAlignCenter;
+                    }
+
+                    // Data rows
+                    for (int i = 0; i < DGVInventory.Rows.Count; i++)
+                    {
+                        for (int j = 0; j < DGVInventory.Columns.Count; j++)
+                        {
+                            sheet.Cells[i + 3, j + 1] = DGVInventory.Rows[i].Cells[j].Value?.ToString() ?? "";
+                            Excel.Range dataCell = (Excel.Range)sheet.Cells[i + 3, j + 1];
+                            dataCell.Font.Size = 15;
+                            dataCell.HorizontalAlignment = Excel.XlHAlign.xlHAlignCenter;
+                            dataCell.VerticalAlignment = Excel.XlVAlign.xlVAlignCenter;
+
+                            if (i % 2 == 0)
+                                dataCell.Interior.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.LightBlue);
+                            else
+                                dataCell.Interior.Color = System.Drawing.ColorTranslator.ToOle(System.Drawing.Color.Bisque);
+                        }
+                    }
+
+                    // Row height for all
+                    Excel.Range allRows = sheet.Range[
+                        sheet.Cells[1, 1],
+                        sheet.Cells[DGVInventory.Rows.Count + 2, DGVInventory.Columns.Count]
+                    ];
+                    allRows.RowHeight = 25;
+
+                    // ✅ Set specific column widths for 14 columns
+                    double[] colWidths = { 10, 10, 35, 15, 15, 12, 10, 10, 10, 10, 10, 12, 15, 15, 15, 15, 15, 18 };
+                    for (int i = 0; i < colWidths.Length && i < DGVInventory.Columns.Count; i++)
+                    {
+                        ((Excel.Range)sheet.Columns[i + 1]).ColumnWidth = colWidths[i];
+                    }
+
+                    // Save file
+                    sheet.SaveAs(fileName);
+                    excelApp.Quit();
+
+                    excelCounter++;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("An error occurred: " + ex.Message);
+            }
+        }
+
+        private void btnPrint_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                PrintDocument printDoc = new PrintDocument();
+                // Reset row index at the start of printing
+                currentRowIndex = 0;
+
+                // Set page settings to match your PDF format
+                printDoc.DefaultPageSettings.Landscape = true;
+                printDoc.DefaultPageSettings.Margins = new Margins(25, 25, 25, 25); // 0.25 inches in hundredths
+
+                // Set paper size to Tabloid (11x17 inches)
+                bool tabloidFound = false;
+                foreach (PaperSize paperSize in printDoc.PrinterSettings.PaperSizes)
+                {
+                    if (paperSize.PaperName == "Tabloid")
+                    {
+                        printDoc.DefaultPageSettings.PaperSize = paperSize;
+                        tabloidFound = true;
+                        break;
+                    }
+                }
+
+                // If Tabloid not found, create custom paper size
+                if (!tabloidFound)
+                {
+                    printDoc.DefaultPageSettings.PaperSize = new PaperSize("Custom", 1100, 1700);
+                }
+
+                printDoc.PrintPage += new PrintPageEventHandler(PrintDoc_PrintPage);
+                PrintDialog printDialog = new PrintDialog
+                {
+                    Document = printDoc
+                };
+
+                if (printDialog.ShowDialog() == DialogResult.OK)
+                {
+                    printDoc.Print();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("An error occurred: " + ex.Message);
+            }
+        }
+
+        private void PrintDoc_PrintPage(object sender, PrintPageEventArgs e)
+        {
+            // Calculate printable area (in hundredths of inches)
+            float printableWidth = e.MarginBounds.Width;
+            float printableHeight = e.MarginBounds.Height;
+
+            // Define heights in hundredths of inches (converting from points)
+            float titleHeight = (40f * 100f) / 72f; // 40 points to hundredths of inches
+            float rowHeight = (40f * 100f) / 72f;   // 40 points to hundredths of inches
+
+            // Calculate available space for rows (subtract title and header)
+            float availableSpaceForRows = printableHeight - titleHeight - rowHeight;
+
+            // Calculate how many rows can fit on this page
+            int rowsPerPage = (int)(availableSpaceForRows / rowHeight);
+            if (rowsPerPage < 1) rowsPerPage = 1; // Ensure at least one row per page
+
+            // Determine the last row to print on this page
+            int lastRow = Math.Min(currentRowIndex + rowsPerPage, DGVInventory.Rows.Count);
+
+            // Create fonts to match PDF
+            System.Drawing.Font titleFont = new System.Drawing.Font("Helvetica", 10, FontStyle.Regular);
+            System.Drawing.Font headerFont = new System.Drawing.Font("Helvetica", 10, FontStyle.Regular);
+            System.Drawing.Font rowFont = new System.Drawing.Font("Helvetica", 12, FontStyle.Regular);
+
+            // Create brushes with exact colors to match PDF
+            Brush darkGrayBrush = new SolidBrush(Color.FromArgb(64, 64, 64)); // PDF DARK_GRAY
+            Brush lightBlueBrush = new SolidBrush(Color.FromArgb(173, 216, 230)); // PDF light blue
+            Brush bisqueBrush = new SolidBrush(Color.FromArgb(255, 228, 196)); // PDF bisque
+            Brush whiteBrush = Brushes.White;
+            Brush blackBrush = Brushes.Black;
+            Pen blackPen = Pens.Black;
+
+            // Draw title only on the first page
+            if (currentRowIndex == 0)
+            {
+                StringFormat titleFormat = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                RectangleF titleRect = new RectangleF(e.MarginBounds.Left, e.MarginBounds.Top, printableWidth, titleHeight);
+                e.Graphics.DrawString("More Sale Details", titleFont, blackBrush, titleRect, titleFormat);
+            }
+
+            // Calculate column widths (same as before)
+            float[] columnWidthPercentages = new float[DGVInventory.ColumnCount];
+            // Column width configuration for 14 columns
+            if (DGVInventory.ColumnCount >= 1) columnWidthPercentages[0] = 3f;   // 5% for column 1
+            if (DGVInventory.ColumnCount >= 2) columnWidthPercentages[1] = 3f;  // 5% for column 2
+            if (DGVInventory.ColumnCount >= 3) columnWidthPercentages[2] = 15f;  // 15% for column 3
+            if (DGVInventory.ColumnCount >= 4) columnWidthPercentages[3] = 6f;   // 5% for column 4
+            if (DGVInventory.ColumnCount >= 5) columnWidthPercentages[4] = 6f;   // 5% for column 5
+            if (DGVInventory.ColumnCount >= 6) columnWidthPercentages[5] = 5f;   // 5% for column 6
+            if (DGVInventory.ColumnCount >= 7) columnWidthPercentages[6] = 5f;   // 5% for column 7
+            if (DGVInventory.ColumnCount >= 8) columnWidthPercentages[7] = 4f;   // 5% for column 8
+            if (DGVInventory.ColumnCount >= 9) columnWidthPercentages[8] = 4f;   // 5% for column 9
+            if (DGVInventory.ColumnCount >= 10) columnWidthPercentages[9] = 4f;  // 5% for column 10
+            if (DGVInventory.ColumnCount >= 11) columnWidthPercentages[10] = 4f; // 5% for column 11
+            if (DGVInventory.ColumnCount >= 12) columnWidthPercentages[11] = 4f; // 5% for column 12
+            if (DGVInventory.ColumnCount >= 13) columnWidthPercentages[12] = 6f; // 5% for column 13
+            if (DGVInventory.ColumnCount >= 14) columnWidthPercentages[13] = 6f; // 5% for column 14
+            if (DGVInventory.ColumnCount >= 15) columnWidthPercentages[14] = 6f; // 5% for column 11
+            if (DGVInventory.ColumnCount >= 16) columnWidthPercentages[15] = 6f; // 5% for column 12
+            if (DGVInventory.ColumnCount >= 17) columnWidthPercentages[16] = 6f; // 5% for column 13
+            if (DGVInventory.ColumnCount >= 18) columnWidthPercentages[17] = 7f; // 5% for column 14
+
+            // Make sure the total adds up to 100% (currently sums to 100%)
+            float totalPercentage = columnWidthPercentages.Sum();
+            if (totalPercentage != 100f)
+            {
+                for (int i = 0; i < columnWidthPercentages.Length; i++)
+                {
+                    columnWidthPercentages[i] = (columnWidthPercentages[i] / totalPercentage) * 100f;
+                }
+            }
+
+            // Calculate actual column widths in points
+            float[] columnWidths = new float[DGVInventory.ColumnCount];
+            for (int i = 0; i < DGVInventory.ColumnCount; i++)
+            {
+                columnWidths[i] = (columnWidthPercentages[i] / 100f) * printableWidth;
+            }
+
+            // Set starting Y position
+            float currentY = e.MarginBounds.Top;
+
+            // Add title height if on first page
+            if (currentRowIndex == 0)
+            {
+                currentY += titleHeight;
+            }
+
+            // Draw table headers on every page
+            float currentX = e.MarginBounds.Left;
+            for (int i = 0; i < DGVInventory.ColumnCount; i++)
+            {
+                RectangleF cellRect = new RectangleF(currentX, currentY, columnWidths[i], rowHeight);
+
+                // Fill background for header
+                e.Graphics.FillRectangle(darkGrayBrush, cellRect);
+
+                // Draw text
+                StringFormat cellFormat = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                e.Graphics.DrawString(DGVInventory.Columns[i].HeaderText, headerFont, whiteBrush, cellRect, cellFormat);
+
+                // Draw border
+                e.Graphics.DrawRectangle(blackPen, cellRect.Left, cellRect.Top, cellRect.Width, cellRect.Height);
+                currentX += columnWidths[i];
+            }
+
+            // Move to first row position
+            currentY += rowHeight;
+
+            // Draw rows for the current page
+            for (int i = currentRowIndex; i < lastRow; i++)
+            {
+                currentX = e.MarginBounds.Left; // Reset X position for each row
+
+                for (int j = 0; j < DGVInventory.ColumnCount; j++)
+                {
+                    RectangleF cellRect = new RectangleF(currentX, currentY, columnWidths[j], rowHeight);
+
+                    // Alternate row colors
+                    if (i % 2 == 0)
+                        e.Graphics.FillRectangle(lightBlueBrush, cellRect);
+                    else
+                        e.Graphics.FillRectangle(bisqueBrush, cellRect);
+
+                    // Draw text
+                    StringFormat cellFormat = new StringFormat
+                    {
+                        Alignment = StringAlignment.Center,
+                        LineAlignment = StringAlignment.Center
+                    };
+                    e.Graphics.DrawString(DGVInventory.Rows[i].Cells[j].Value?.ToString() ?? "", rowFont, blackBrush, cellRect, cellFormat);
+
+                    // Draw border
+                    e.Graphics.DrawRectangle(blackPen, cellRect.Left, cellRect.Top, cellRect.Width, cellRect.Height);
+                    currentX += columnWidths[j];
+                }
+                currentY += rowHeight;
+            }
+
+            // Update current row index for next page
+            currentRowIndex = lastRow;
+
+            // Check if there are more rows to print
+            if (currentRowIndex < DGVInventory.Rows.Count)
+            {
+                e.HasMorePages = true; // There are more rows to print
+            }
+            else
+            {
+                e.HasMorePages = false; // All rows have been printed
+                currentRowIndex = 0; // Reset for next print job
+            }
+
+            // Dispose custom resources
+            darkGrayBrush.Dispose();
+            lightBlueBrush.Dispose();
+            bisqueBrush.Dispose();
+            titleFont.Dispose();
+            headerFont.Dispose();
+            rowFont.Dispose();
+        }
+
+        private void SalesmanInventoryStore_VisibleChanged(object sender, EventArgs e)
+        {
+            if (this.Visible)
+            {
+                // Refresh the DataGridView when the form becomes visible
+                PopulateGridViewSaleInventory(txtSearchBar.Text.Trim());
+            }
+        }
     }
 }

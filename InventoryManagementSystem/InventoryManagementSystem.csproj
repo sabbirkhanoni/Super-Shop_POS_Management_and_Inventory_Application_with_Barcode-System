@@ -39,9 +39,16 @@
     <Reference Include="itextsharp, Version=5.5.13.4, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
       <HintPath>..\packages\iTextSharp.5.5.13.4\lib\net461\itextsharp.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.Office.Interop.Excel, Version=15.0.0.0, Culture=neutral, PublicKeyToken=71e9bce111e9429c, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Office.Interop.Excel.15.0.4795.1001\lib\net20\Microsoft.Office.Interop.Excel.dll</HintPath>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing.Common, Version=9.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Drawing.Common.9.0.8\lib\net462\System.Drawing.Common.dll</HintPath>
+    </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -65,6 +72,12 @@
     <Compile Include="AddCustomer.Designer.cs">
       <DependentUpon>AddCustomer.cs</DependentUpon>
     </Compile>
+    <Compile Include="AddProductPurchaseDetails.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="AddProductPurchaseDetails.Designer.cs">
+      <DependentUpon>AddProductPurchaseDetails.cs</DependentUpon>
+    </Compile>
     <Compile Include="AddProducts.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -76,6 +89,12 @@
     </Compile>
     <Compile Include="AddSupplier.Designer.cs">
       <DependentUpon>AddSupplier.cs</DependentUpon>
+    </Compile>
+    <Compile Include="AdminAllSaleDetails.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="AdminAllSaleDetails.Designer.cs">
+      <DependentUpon>AdminAllSaleDetails.cs</DependentUpon>
     </Compile>
     <Compile Include="AdminCreatesNewUser.cs">
       <SubType>Form</SubType>
@@ -107,23 +126,11 @@
     <Compile Include="AdminMoreSaleDetails.Designer.cs">
       <DependentUpon>AdminMoreSaleDetails.cs</DependentUpon>
     </Compile>
-    <Compile Include="AdminPersonalSettings.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="AdminPersonalSettings.Designer.cs">
-      <DependentUpon>AdminPersonalSettings.cs</DependentUpon>
-    </Compile>
     <Compile Include="AdminSaleDetails.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="AdminSaleDetails.Designer.cs">
       <DependentUpon>AdminSaleDetails.cs</DependentUpon>
-    </Compile>
-    <Compile Include="check.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="check.Designer.cs">
-      <DependentUpon>check.cs</DependentUpon>
     </Compile>
     <Compile Include="CustomerDueDetails.cs">
       <SubType>Form</SubType>
@@ -138,6 +145,7 @@
     <Compile Include="ForgetPasswordDialog.Designer.cs">
       <DependentUpon>ForgetPasswordDialog.cs</DependentUpon>
     </Compile>
+    <Compile Include="FormManager.cs" />
     <Compile Include="SalesmanInventoryStore.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -184,11 +192,17 @@
     <EmbeddedResource Include="AddCustomer.resx">
       <DependentUpon>AddCustomer.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="AddProductPurchaseDetails.resx">
+      <DependentUpon>AddProductPurchaseDetails.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="AddProducts.resx">
       <DependentUpon>AddProducts.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="AddSupplier.resx">
       <DependentUpon>AddSupplier.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="AdminAllSaleDetails.resx">
+      <DependentUpon>AdminAllSaleDetails.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="AdminCreatesNewUser.resx">
       <DependentUpon>AdminCreatesNewUser.cs</DependentUpon>
@@ -205,14 +219,8 @@
     <EmbeddedResource Include="AdminMoreSaleDetails.resx">
       <DependentUpon>AdminMoreSaleDetails.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="AdminPersonalSettings.resx">
-      <DependentUpon>AdminPersonalSettings.cs</DependentUpon>
-    </EmbeddedResource>
     <EmbeddedResource Include="AdminSaleDetails.resx">
       <DependentUpon>AdminSaleDetails.cs</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Include="check.resx">
-      <DependentUpon>check.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="CustomerDueDetails.resx">
       <DependentUpon>CustomerDueDetails.cs</DependentUpon>
@@ -293,6 +301,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\plus.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Resources\loading.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

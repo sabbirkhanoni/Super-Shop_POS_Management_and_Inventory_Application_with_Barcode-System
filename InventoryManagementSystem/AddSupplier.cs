@@ -205,15 +205,18 @@ namespace InventoryManagementSystem
 
         private void btnBack_Click(object sender, EventArgs e)
         {
-            SalesmanInventoryStore store = new SalesmanInventoryStore();
-            store.Show();
-            this.Hide();
+            FormManager.OpenForm(this, typeof(AdminMainDashBoard));
         }
 
         private void DGVSupplier_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
         {
             DGVSupplier.ClearSelection();
             DGVSupplier.CurrentCell = null;
+        }
+
+        private void btnClose_Click(object sender, EventArgs e)
+        {
+            this.Close();
         }
     }
 }

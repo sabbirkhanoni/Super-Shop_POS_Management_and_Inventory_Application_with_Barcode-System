@@ -49,11 +49,11 @@
             this.Password = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.Role = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.panel2 = new System.Windows.Forms.Panel();
+            this.label13 = new System.Windows.Forms.Label();
             this.btnBack = new System.Windows.Forms.Button();
             this.panel1 = new System.Windows.Forms.Panel();
             this.cmbRole = new System.Windows.Forms.ComboBox();
             this.label3 = new System.Windows.Forms.Label();
-            this.label13 = new System.Windows.Forms.Label();
             this.panel5.SuspendLayout();
             this.panel4.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.DGVUser)).BeginInit();
@@ -284,15 +284,26 @@
             this.panel2.Size = new System.Drawing.Size(1523, 66);
             this.panel2.TabIndex = 25;
             // 
+            // label13
+            // 
+            this.label13.AutoSize = true;
+            this.label13.Font = new System.Drawing.Font("Microsoft Sans Serif", 19.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label13.ForeColor = System.Drawing.SystemColors.ButtonHighlight;
+            this.label13.Location = new System.Drawing.Point(8, 13);
+            this.label13.Name = "label13";
+            this.label13.Size = new System.Drawing.Size(246, 38);
+            this.label13.TabIndex = 25;
+            this.label13.Text = "Add Employees";
+            // 
             // btnBack
             // 
             this.btnBack.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.btnBack.BackColor = System.Drawing.Color.MidnightBlue;
             this.btnBack.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnBack.ForeColor = System.Drawing.SystemColors.Control;
-            this.btnBack.Location = new System.Drawing.Point(1410, 0);
+            this.btnBack.Location = new System.Drawing.Point(1406, 4);
             this.btnBack.Name = "btnBack";
-            this.btnBack.Size = new System.Drawing.Size(113, 66);
+            this.btnBack.Size = new System.Drawing.Size(113, 55);
             this.btnBack.TabIndex = 22;
             this.btnBack.Text = "Back";
             this.btnBack.UseVisualStyleBackColor = false;
@@ -334,17 +345,6 @@
             this.label3.TabIndex = 13;
             this.label3.Text = "Role";
             // 
-            // label13
-            // 
-            this.label13.AutoSize = true;
-            this.label13.Font = new System.Drawing.Font("Microsoft Sans Serif", 19.8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label13.ForeColor = System.Drawing.SystemColors.ButtonHighlight;
-            this.label13.Location = new System.Drawing.Point(8, 13);
-            this.label13.Name = "label13";
-            this.label13.Size = new System.Drawing.Size(246, 38);
-            this.label13.TabIndex = 25;
-            this.label13.Text = "Add Employees";
-            // 
             // AdminCreatesNewUser
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -359,6 +359,7 @@
             this.Name = "AdminCreatesNewUser";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "AdminCreatesNewUser";
+            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
             this.panel5.ResumeLayout(false);
             this.panel4.ResumeLayout(false);
             this.panel4.PerformLayout();
