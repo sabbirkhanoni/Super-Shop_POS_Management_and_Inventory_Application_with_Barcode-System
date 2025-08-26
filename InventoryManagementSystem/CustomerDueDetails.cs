@@ -125,9 +125,7 @@ namespace InventoryManagementSystem
 
         private void btnBack_Click(object sender, EventArgs e)
         {
-            AdminMainDashBoard adminMainDashBoard = new AdminMainDashBoard();
-            adminMainDashBoard.Show();
-            this.Hide();
+            FormManager.OpenForm(this, typeof(AdminMainDashBoard));
         }
 
         private void DGVCustomerDueDetails_DataBindingComplete(object sender, DataGridViewBindingCompleteEventArgs e)
